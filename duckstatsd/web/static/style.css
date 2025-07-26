@@ -153,6 +153,12 @@ body {
   font-size: 0.9rem;
 }
 
+.filter-group small {
+  color: #666;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
 select,
 input {
   padding: 0.5rem;
@@ -349,6 +355,43 @@ button:hover,
   text-decoration: underline;
 }
 
+/* Filter status */
+.filter-status {
+  background: #e3f2fd;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #1976d2;
+}
+
+.filter-status code {
+  background: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  font-family: monospace;
+  margin: 0 0.5rem;
+}
+
+.clear-filter {
+  color: #1976d2;
+  text-decoration: none;
+  margin-left: 1rem;
+  font-size: 0.9rem;
+}
+
+.clear-filter:hover {
+  text-decoration: underline;
+}
+
+.tag-value-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.tag-value-link:hover .tag-value {
+  background: #e3f2fd;
+}
+
 .chart-placeholder {
   background: white;
   padding: 2rem;
@@ -391,4 +434,3 @@ footer {
     grid-template-columns: 1fr;
   }
 }
-

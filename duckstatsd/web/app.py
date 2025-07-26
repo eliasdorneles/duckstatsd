@@ -281,12 +281,14 @@ def create_app(db_path: str = "metrics.db"):
 
         metric_name = request.args.get("metric_name", "").strip()
         metric_type = request.args.get("metric_type", "")
+        tag_filter = request.args.get("tag_filter", "").strip()
         hours = request.args.get("hours", "")
 
         # Convert empty strings to None
         filters = {
             "metric_name": metric_name or None,
             "metric_type": metric_type or None,
+            "tag_filter": tag_filter or None,
             "hours": int(hours) if hours else None,
         }
 

@@ -232,6 +232,7 @@ class MetricsDB:
         metric_name: Optional[str] = None,
         metric_type: Optional[str] = None,
         hours: Optional[int] = None,
+        tag_filter: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Get raw metrics with filtering."""
         conditions = []
@@ -249,6 +250,17 @@ class MetricsDB:
             since = datetime.utcnow() - timedelta(hours=hours)
             conditions.append("timestamp >= ?")
             params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if tag_filter:
+            # Parse tag_filter format: "key:value"
+            if ":" in tag_filter:
+                tag_key, tag_value = tag_filter.split(":", 1)
+                conditions.append("json_extract(tags, '$.' || ?) = ?")
+                params.extend([tag_key, tag_value])
+            else:
+                # Just search for tag key existence
+                conditions.append("json_extract(tags, '$.' || ?) IS NOT NULL")
+                params.append(tag_filter)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         params.extend([limit, offset])

@@ -40,7 +40,9 @@
                 {% for value in tag_values %}
                 <tr>
                     <td>
-                        <span class="tag-value">{{ value.tag_value }}</span>
+                        <a href="/raw?tag_filter={{ selected_tag_key }}:{{ value.tag_value }}" class="tag-value-link">
+                            <span class="tag-value">{{ value.tag_value }}</span>
+                        </a>
                     </td>
                     <td>{{ value.count }}</td>
                     <td>{{ value.last_seen.split(' ')[1][:8] if value.last_seen else '-' }}</td>

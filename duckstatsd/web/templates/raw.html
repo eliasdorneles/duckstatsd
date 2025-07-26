@@ -27,6 +27,14 @@
             </div>
             
             <div class="filter-group">
+                <label for="tag_filter">Tag Filter:</label>
+                <input type="text" id="tag_filter" name="tag_filter" 
+                       value="{{ filters.tag_filter or '' }}" 
+                       placeholder="key:value or just key">
+                <small>Examples: status:200, env:prod, or just method</small>
+            </div>
+            
+            <div class="filter-group">
                 <label for="hours">Time Range:</label>
                 <select id="hours" name="hours">
                     <option value="">All Time</option>
@@ -43,6 +51,13 @@
         </div>
     </form>
 </div>
+
+{% if filters.tag_filter %}
+<div class="filter-status">
+    <p>Showing metrics with tag filter: <code>{{ filters.tag_filter }}</code>
+    <a href="/raw" class="clear-filter">Clear filter</a></p>
+</div>
+{% endif %}
 
 <section class="raw-data">
     {% if raw_metrics %}
@@ -83,13 +98,13 @@
     
     <div class="pagination">
         {% if page > 1 %}
-        <a href="?{{ filters|urlencode }}&page={{ page - 1 }}" class="btn-page">← Previous</a>
+        <a href="?{% for key, value in filters.items() %}{% if value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page - 1 }}" class="btn-page">← Previous</a>
         {% endif %}
         
         <span class="page-info">Page {{ page }}</span>
         
         {% if has_next %}
-        <a href="?{{ filters|urlencode }}&page={{ page + 1 }}" class="btn-page">Next →</a>
+        <a href="?{% for key, value in filters.items() %}{% if value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page + 1 }}" class="btn-page">Next →</a>
         {% endif %}
     </div>
     
