@@ -12,3 +12,8 @@ dependencies = [
 [project.scripts]
 duckstatsd = "duckstatsd.main:main"
 duckstatsd-web = "duckstatsd.web.app:main"
+
+[dependency-groups]
+dev = [
+    "datadog>=0.52.0",
+]
