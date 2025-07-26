@@ -3,7 +3,6 @@ from flask import Flask, render_template, request
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.utils import PlotlyJSONEncoder
-import json
 from datetime import datetime
 
 from .database import MetricsDB

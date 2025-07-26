@@ -17,3 +17,6 @@ duckstatsd-web = "duckstatsd.web.app:main"
 dev = [
     "datadog>=0.52.0",
 ]
+
+[tool.setuptools.package-data]
+duckstatsd = ["web/templates/*.html", "web/static/*.css"]
