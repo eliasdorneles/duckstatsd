@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DuckStatsD{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="dashboard-controls">
+    <form method="GET">
+        <label for="hours">Time Range:</label>
+        <select name="hours" id="hours" onchange="this.form.submit()">
+            <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+            <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+            <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+        </select>
+    </form>
+</div>
+
+<div class="dashboard-grid">
+    <section class="metrics-summary">
+        <h3>Metrics Summary ({{ time_range }}h)</h3>
+        <div class="summary-stats">
+            <div class="stat-item">
+                <span class="stat-label">Counters:</span>
+                <span class="stat-value">{{ metrics_summary.c }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Gauges:</span>
+                <span class="stat-value">{{ metrics_summary.g }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Timers:</span>
+                <span class="stat-value">{{ metrics_summary.ms }}</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Sets:</span>
+                <span class="stat-value">{{ metrics_summary.s }}</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="active-metrics">
+        <h3>Most Active Metrics (1h)</h3>
+        {% if active_metrics %}
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Type</th>
+                    <th>Events</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in active_metrics %}
+                <tr>
+                    <td>{{ metric.metric_name }}</td>
+                    <td><span class="metric-type metric-type-{{ metric.metric_type }}">{{ metric.metric_type }}</span></td>
+                    <td>{{ metric.event_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="no-data">No active metrics in the last hour.</p>
+        {% endif %}
+    </section>
+</div>
+
+<section class="recent-activity">
+    <h3>Recent Activity (Last 50 metrics)</h3>
+    {% if recent_metrics %}
+    <table class="metrics-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Metric</th>
+                <th>Type</th>
+                <th>Value</th>
+                <th>Tags</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for metric in recent_metrics %}
+            <tr>
+                <td>{{ metric.timestamp_display }}</td>
+                <td>{{ metric.metric_name }}</td>
+                <td><span class="metric-type metric-type-{{ metric.metric_type }}">{{ metric.metric_type }}</span></td>
+                <td>
+                    {% if metric.value is not none %}
+                        {{ "%.2f"|format(metric.value) }}
+                        {% if metric.sample_rate != 1.0 %}
+                            <small>(@{{ metric.sample_rate }})</small>
+                        {% endif %}
+                    {% else %}
+                        {{ metric.string_value }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if metric.tags %}
+                        <small>{{ metric.tags }}</small>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="no-data">No recent metrics found.</p>
+    {% endif %}
+</section>
+{% endblock %}

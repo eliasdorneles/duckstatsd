@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Timers - DuckStatsD{% endblock %}
+
+{% block content %}
+<h2>Timers</h2>
+
+<div class="page-controls">
+    <form method="GET">
+        {% if selected_timer %}
+            <input type="hidden" name="metric" value="{{ selected_timer }}">
+        {% endif %}
+        <label for="hours">Time Range:</label>
+        <select name="hours" id="hours" onchange="this.form.submit()">
+            <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+            <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+            <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+        </select>
+    </form>
+</div>
+
+<div class="timers-layout">
+    <section class="timer-list">
+        <h3>Timer Metrics</h3>
+        {% if timer_metrics %}
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Avg (ms)</th>
+                    <th>Min (ms)</th>
+                    <th>Max (ms)</th>
+                    <th>Events</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for timer in timer_metrics %}
+                <tr class="{% if selected_timer == timer.metric_name %}selected{% endif %}">
+                    <td>
+                        <a href="?metric={{ timer.metric_name }}&hours={{ time_range }}">
+                            {{ timer.metric_name }}
+                        </a>
+                    </td>
+                    <td>{{ "%.1f"|format(timer.avg_value) }}</td>
+                    <td>{{ "%.1f"|format(timer.min_value) }}</td>
+                    <td>{{ "%.1f"|format(timer.max_value) }}</td>
+                    <td>{{ timer.event_count }}</td>
+                    <td>{{ timer.last_seen.split(' ')[1][:8] if timer.last_seen else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="no-data">No timer metrics found.</p>
+        {% endif %}
+    </section>
+
+    {% if selected_timer %}
+    <section class="timer-chart">
+        <h3>Distribution: {{ selected_timer }}</h3>
+        {% if chart_html %}
+            {{ chart_html|safe }}
+        {% else %}
+            <p class="no-data">No data for selected time range.</p>
+        {% endif %}
+    </section>
+    {% else %}
+    <section class="timer-chart">
+        <div class="chart-placeholder">
+            <p>Select a timer from the list to view its distribution histogram.</p>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

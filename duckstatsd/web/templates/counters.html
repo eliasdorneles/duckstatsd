@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Counters - DuckStatsD{% endblock %}
+
+{% block content %}
+<h2>Counters</h2>
+
+<div class="page-controls">
+    <form method="GET">
+        {% if selected_counter %}
+            <input type="hidden" name="metric" value="{{ selected_counter }}">
+        {% endif %}
+        <label for="hours">Time Range:</label>
+        <select name="hours" id="hours" onchange="this.form.submit()">
+            <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+            <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+            <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+        </select>
+    </form>
+</div>
+
+<div class="counters-layout">
+    <section class="counter-list">
+        <h3>Counter Metrics</h3>
+        {% if counter_metrics %}
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Total Count</th>
+                    <th>Events</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for counter in counter_metrics %}
+                <tr class="{% if selected_counter == counter.metric_name %}selected{% endif %}">
+                    <td>
+                        <a href="?metric={{ counter.metric_name }}&hours={{ time_range }}">
+                            {{ counter.metric_name }}
+                        </a>
+                    </td>
+                    <td>{{ "%.1f"|format(counter.total_count) }}</td>
+                    <td>{{ counter.event_count }}</td>
+                    <td>{{ counter.last_seen.split(' ')[1][:8] if counter.last_seen else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="no-data">No counter metrics found.</p>
+        {% endif %}
+    </section>
+
+    {% if selected_counter %}
+    <section class="counter-chart">
+        <h3>Rate Chart: {{ selected_counter }}</h3>
+        {% if chart_html %}
+            {{ chart_html|safe }}
+        {% else %}
+            <p class="no-data">No data for selected time range.</p>
+        {% endif %}
+    </section>
+    {% else %}
+    <section class="counter-chart">
+        <div class="chart-placeholder">
+            <p>Select a counter from the list to view its rate chart.</p>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

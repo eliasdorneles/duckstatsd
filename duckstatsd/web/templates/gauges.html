@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Gauges - DuckStatsD{% endblock %}
+
+{% block content %}
+<h2>Gauges</h2>
+
+<div class="page-controls">
+    <form method="GET">
+        {% if selected_gauge %}
+            <input type="hidden" name="metric" value="{{ selected_gauge }}">
+        {% endif %}
+        <label for="hours">Time Range:</label>
+        <select name="hours" id="hours" onchange="this.form.submit()">
+            <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+            <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+            <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+        </select>
+    </form>
+</div>
+
+<div class="gauges-layout">
+    <section class="gauge-list">
+        <h3>Current Gauge Values</h3>
+        {% if gauge_metrics %}
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Current Value</th>
+                    <th>Last Updated</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gauge in gauge_metrics %}
+                <tr class="{% if selected_gauge == gauge.metric_name %}selected{% endif %}">
+                    <td>
+                        <a href="?metric={{ gauge.metric_name }}&hours={{ time_range }}">
+                            {{ gauge.metric_name }}
+                        </a>
+                    </td>
+                    <td>{{ "%.2f"|format(gauge.value) }}</td>
+                    <td>{{ gauge.timestamp.split(' ')[1][:8] if gauge.timestamp else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="no-data">No gauge metrics found.</p>
+        {% endif %}
+    </section>
+
+    {% if selected_gauge %}
+    <section class="gauge-chart">
+        <h3>Trend: {{ selected_gauge }}</h3>
+        
+        {% if stats %}
+        <div class="gauge-stats">
+            <span>Min: {{ "%.2f"|format(stats.min) }}</span> |
+            <span>Max: {{ "%.2f"|format(stats.max) }}</span> |
+            <span>Avg: {{ "%.2f"|format(stats.avg) }}</span>
+        </div>
+        {% endif %}
+        
+        {% if chart_html %}
+            {{ chart_html|safe }}
+        {% else %}
+            <p class="no-data">No data for selected time range.</p>
+        {% endif %}
+    </section>
+    {% else %}
+    <section class="gauge-chart">
+        <div class="chart-placeholder">
+            <p>Select a gauge from the list to view its trend chart.</p>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

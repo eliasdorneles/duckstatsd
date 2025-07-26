@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DuckStatsD{% endblock %}</title>
+    <meta http-equiv="refresh" content="30">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h1>🦆 DuckStatsD</h1>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if current_page == 'dashboard' %}active{% endif %}">Dashboard</a></li>
+            <li><a href="/counters" class="{% if current_page == 'counters' %}active{% endif %}">Counters</a></li>
+            <li><a href="/gauges" class="{% if current_page == 'gauges' %}active{% endif %}">Gauges</a></li>
+            <li><a href="/timers" class="{% if current_page == 'timers' %}active{% endif %}">Timers</a></li>
+            <li><a href="/sets" class="{% if current_page == 'sets' %}active{% endif %}">Sets</a></li>
+            <li><a href="/raw" class="{% if current_page == 'raw' %}active{% endif %}">Raw Data</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <p>Auto-refresh every 30 seconds</p>
+    </footer>
+</body>
+</html>
