@@ -37,6 +37,25 @@
                 <span class="stat-value">{{ metrics_summary.s }}</span>
             </div>
         </div>
+        
+        {% if tag_summary %}
+        <h4>Active Tags ({{ time_range }}h)</h4>
+        <div class="tag-summary-compact">
+            {% for tag in tag_summary[:5] %}
+            <div class="tag-summary-item">
+                <a href="/tags?tag_key={{ tag.tag_key }}" class="tag-key-link">
+                    {{ tag.tag_key }}
+                </a>
+                <small>({{ tag.usage_count }} uses, {{ tag.unique_values }} values)</small>
+            </div>
+            {% endfor %}
+            {% if tag_summary|length > 5 %}
+            <div class="tag-summary-more">
+                <a href="/tags">View all tags →</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
     </section>
 
     <section class="active-metrics">

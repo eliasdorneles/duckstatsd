@@ -23,6 +23,7 @@ def create_app(db_path: str = "metrics.db"):
         recent_metrics = db.get_recent_metrics(50)
         metrics_summary = db.get_metrics_summary(time_range)
         active_metrics = db.get_active_metrics(1, 10)
+        tag_summary = db.get_tag_summary(time_range)
 
         # Format timestamps for display
         for metric in recent_metrics:
@@ -35,6 +36,7 @@ def create_app(db_path: str = "metrics.db"):
             recent_metrics=recent_metrics,
             metrics_summary=metrics_summary,
             active_metrics=active_metrics,
+            tag_summary=tag_summary,
             time_range=time_range,
             current_page="dashboard",
         )
@@ -43,43 +45,92 @@ def create_app(db_path: str = "metrics.db"):
     def counters():
         """Counters page with rate chart."""
         selected_counter = request.args.get("metric")
+        selected_tag_key = request.args.get("tag_key")
         time_range = int(request.args.get("hours", 24))
 
         counter_metrics = db.get_counter_metrics()
+        available_tag_keys = db.get_all_tag_keys()
         chart_html = None
 
         if selected_counter:
-            timeseries_data = db.get_counter_timeseries(selected_counter, time_range)
+            if selected_tag_key:
+                # Tag-grouped chart
+                timeseries_data = db.get_counter_timeseries_by_tag(
+                    selected_counter, selected_tag_key, time_range
+                )
 
-            if timeseries_data:
-                times = [item["minute"] for item in timeseries_data]
-                counts = [item["count"] for item in timeseries_data]
+                if timeseries_data:
+                    # Group by tag value
+                    tag_groups = {}
+                    for item in timeseries_data:
+                        tag_value = item["tag_value"] or "null"
+                        if tag_value not in tag_groups:
+                            tag_groups[tag_value] = {"times": [], "counts": []}
+                        tag_groups[tag_value]["times"].append(item["minute"])
+                        tag_groups[tag_value]["counts"].append(item["count"])
 
-                fig = go.Figure()
-                fig.add_trace(
-                    go.Scatter(
-                        x=times,
-                        y=counts,
-                        mode="lines+markers",
-                        name=selected_counter,
-                        line=dict(width=2),
+                    fig = go.Figure()
+                    for tag_value, data in tag_groups.items():
+                        fig.add_trace(
+                            go.Scatter(
+                                x=data["times"],
+                                y=data["counts"],
+                                mode="lines+markers",
+                                name=f"{selected_tag_key}={tag_value}",
+                                line=dict(width=2),
+                            )
+                        )
+
+                    fig.update_layout(
+                        title=f"Counter Rate: {selected_counter} by {selected_tag_key}",
+                        xaxis_title="Time",
+                        yaxis_title="Events per Minute",
+                        height=400,
+                        margin=dict(l=0, r=0, t=40, b=0),
                     )
+
+                    chart_html = fig.to_html(
+                        include_plotlyjs="cdn", div_id="counter-chart"
+                    )
+            else:
+                # Regular chart
+                timeseries_data = db.get_counter_timeseries(
+                    selected_counter, time_range
                 )
 
-                fig.update_layout(
-                    title=f"Counter Rate: {selected_counter}",
-                    xaxis_title="Time",
-                    yaxis_title="Events per Minute",
-                    height=400,
-                    margin=dict(l=0, r=0, t=40, b=0),
-                )
+                if timeseries_data:
+                    times = [item["minute"] for item in timeseries_data]
+                    counts = [item["count"] for item in timeseries_data]
 
-                chart_html = fig.to_html(include_plotlyjs="cdn", div_id="counter-chart")
+                    fig = go.Figure()
+                    fig.add_trace(
+                        go.Scatter(
+                            x=times,
+                            y=counts,
+                            mode="lines+markers",
+                            name=selected_counter,
+                            line=dict(width=2),
+                        )
+                    )
+
+                    fig.update_layout(
+                        title=f"Counter Rate: {selected_counter}",
+                        xaxis_title="Time",
+                        yaxis_title="Events per Minute",
+                        height=400,
+                        margin=dict(l=0, r=0, t=40, b=0),
+                    )
+
+                    chart_html = fig.to_html(
+                        include_plotlyjs="cdn", div_id="counter-chart"
+                    )
 
         return render_template(
             "counters.html",
             counter_metrics=counter_metrics,
             selected_counter=selected_counter,
+            selected_tag_key=selected_tag_key,
+            available_tag_keys=available_tag_keys,
             chart_html=chart_html,
             time_range=time_range,
             current_page="counters",
@@ -194,6 +245,31 @@ def create_app(db_path: str = "metrics.db"):
             selected_set=selected_set,
             recent_members=recent_members,
             current_page="sets",
+        )
+
+    @app.route("/tags")
+    def tags():
+        """Tags explorer page."""
+        selected_tag_key = request.args.get("tag_key")
+
+        tag_keys = db.get_all_tag_keys()
+        tag_values = []
+        tag_summary = db.get_tag_summary(24)
+        top_combinations = db.get_top_tag_combinations(10)
+        recent_tagged_metrics = db.get_recent_tagged_metrics(20)
+
+        if selected_tag_key:
+            tag_values = db.get_tag_values(selected_tag_key, 50)
+
+        return render_template(
+            "tags.html",
+            tag_keys=tag_keys,
+            selected_tag_key=selected_tag_key,
+            tag_values=tag_values,
+            tag_summary=tag_summary,
+            top_combinations=top_combinations,
+            recent_tagged_metrics=recent_tagged_metrics,
+            current_page="tags",
         )
 
     @app.route("/raw")

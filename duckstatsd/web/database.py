@@ -269,3 +269,203 @@ class MetricsDB:
             )
             return cursor.fetchall()
 
+    # Tag-related queries
+    def get_all_tag_keys(self) -> List[str]:
+        """Get all unique tag keys across all metrics."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Use SQLite JSON functions to extract all keys
+            cursor.execute("""
+                SELECT DISTINCT json_each.key
+                FROM raw_metrics, json_each(raw_metrics.tags)
+                WHERE tags IS NOT NULL AND tags != 'null'
+                ORDER BY json_each.key
+            """)
+            return [row[0] for row in cursor.fetchall()]
+
+    def get_tag_values(self, tag_key: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get all values for a specific tag key with counts."""
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT json_extract(tags, '$.' || ?) as tag_value,
+                       COUNT(*) as count,
+                       MAX(timestamp) as last_seen
+                FROM raw_metrics
+                WHERE tags IS NOT NULL 
+                  AND json_extract(tags, '$.' || ?) IS NOT NULL
+                GROUP BY tag_value
+                ORDER BY count DESC
+                LIMIT ?
+            """,
+                (tag_key, tag_key, limit),
+            )
+            return cursor.fetchall()
+
+    def get_top_tag_combinations(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get most common tag combinations."""
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT tags,
+                       COUNT(*) as count,
+                       MAX(timestamp) as last_seen
+                FROM raw_metrics
+                WHERE tags IS NOT NULL AND tags != 'null' AND tags != '{}'
+                GROUP BY tags
+                ORDER BY count DESC
+                LIMIT ?
+            """,
+                (limit,),
+            )
+            return cursor.fetchall()
+
+    def get_recent_tagged_metrics(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get recent metrics that have tags."""
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT metric_name, metric_type, value, string_value,
+                       sample_rate, tags, timestamp
+                FROM raw_metrics
+                WHERE tags IS NOT NULL AND tags != 'null' AND tags != '{}'
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """,
+                (limit,),
+            )
+            return cursor.fetchall()
+
+    def get_counter_timeseries_by_tag(
+        self, metric_name: str, tag_key: str, hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """Get counter time series grouped by tag value."""
+        since = datetime.utcnow() - timedelta(hours=hours)
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT strftime('%Y-%m-%d %H:%M:00', timestamp) as minute,
+                       json_extract(tags, '$.' || ?) as tag_value,
+                       SUM(value / sample_rate) as count
+                FROM raw_metrics 
+                WHERE metric_type = 'c' 
+                  AND metric_name = ?
+                  AND timestamp >= ?
+                  AND json_extract(tags, '$.' || ?) IS NOT NULL
+                GROUP BY minute, tag_value
+                ORDER BY minute, tag_value
+            """,
+                (tag_key, metric_name, since.strftime("%Y-%m-%d %H:%M:%S"), tag_key),
+            )
+            return cursor.fetchall()
+
+    def get_gauge_timeseries_by_tag(
+        self, metric_name: str, tag_key: str, hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """Get gauge time series grouped by tag value."""
+        since = datetime.utcnow() - timedelta(hours=hours)
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT timestamp,
+                       json_extract(tags, '$.' || ?) as tag_value,
+                       value
+                FROM raw_metrics 
+                WHERE metric_type = 'g' 
+                  AND metric_name = ?
+                  AND timestamp >= ?
+                  AND json_extract(tags, '$.' || ?) IS NOT NULL
+                ORDER BY timestamp, tag_value
+            """,
+                (tag_key, metric_name, since.strftime("%Y-%m-%d %H:%M:%S"), tag_key),
+            )
+            return cursor.fetchall()
+
+    def get_timer_values_by_tag(
+        self, metric_name: str, tag_key: str, hours: int = 24
+    ) -> List[Dict[str, Any]]:
+        """Get timer values grouped by tag value."""
+        since = datetime.utcnow() - timedelta(hours=hours)
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT json_extract(tags, '$.' || ?) as tag_value,
+                       value
+                FROM raw_metrics 
+                WHERE metric_type = 'ms' 
+                  AND metric_name = ?
+                  AND timestamp >= ?
+                  AND json_extract(tags, '$.' || ?) IS NOT NULL
+                ORDER BY timestamp
+            """,
+                (tag_key, metric_name, since.strftime("%Y-%m-%d %H:%M:%S"), tag_key),
+            )
+            return cursor.fetchall()
+
+    def get_metrics_by_tag_filter(
+        self,
+        tag_key: str,
+        tag_value: str,
+        metric_type: Optional[str] = None,
+        hours: int = 24,
+    ) -> List[Dict[str, Any]]:
+        """Get metrics filtered by specific tag key=value."""
+        since = datetime.utcnow() - timedelta(hours=hours)
+        conditions = ["timestamp >= ?", "json_extract(tags, '$.' || ?) = ?"]
+        params = [since.strftime("%Y-%m-%d %H:%M:%S"), tag_key, tag_value]
+
+        if metric_type:
+            conditions.append("metric_type = ?")
+            params.append(metric_type)
+
+        where_clause = " AND ".join(conditions)
+
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT metric_name, metric_type, value, string_value,
+                       sample_rate, tags, timestamp
+                FROM raw_metrics
+                WHERE {where_clause}
+                ORDER BY timestamp DESC
+                LIMIT 1000
+            """,
+                params,
+            )
+            return cursor.fetchall()
+
+    def get_tag_summary(self, hours: int = 24) -> List[Dict[str, Any]]:
+        """Get summary of tag usage."""
+        since = datetime.utcnow() - timedelta(hours=hours)
+        with self._get_connection() as conn:
+            conn.row_factory = self._dict_factory
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT json_each.key as tag_key,
+                       COUNT(*) as usage_count,
+                       COUNT(DISTINCT json_each.value) as unique_values,
+                       MAX(timestamp) as last_seen
+                FROM raw_metrics, json_each(raw_metrics.tags)
+                WHERE timestamp >= ?
+                  AND tags IS NOT NULL AND tags != 'null'
+                GROUP BY json_each.key
+                ORDER BY usage_count DESC
+            """,
+                (since.strftime("%Y-%m-%d %H:%M:%S"),),
+            )
+            return cursor.fetchall()
