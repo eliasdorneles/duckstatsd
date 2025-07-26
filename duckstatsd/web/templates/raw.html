@@ -30,8 +30,12 @@
                 <label for="tag_filter">Tag Filter:</label>
                 <input type="text" id="tag_filter" name="tag_filter" 
                        value="{{ filters.tag_filter or '' }}" 
-                       placeholder="key:value or just key">
-                <small>Examples: status:200, env:prod, or just method</small>
+                       placeholder="status:200 OR (env:prod AND -method:GET)">
+                <small>
+                    Examples: <code>status:200</code>, <code>env:prod AND method:GET</code>, 
+                    <code>status:200 OR status:201</code>, <code>-status:500</code>,
+                    <code>(env:prod OR env:staging) AND -status:404</code>
+                </small>
             </div>
             
             <div class="filter-group">
@@ -54,8 +58,8 @@
 
 {% if filters.tag_filter %}
 <div class="filter-status">
-    <p>Showing metrics with tag filter: <code>{{ filters.tag_filter }}</code>
-    <a href="/raw" class="clear-filter">Clear filter</a></p>
+    <p><strong>Tag Filter:</strong> <code class="tag-filter-expression">{{ filters.tag_filter }}</code>
+    <a href="?{% for key, value in filters.items() %}{% if key != 'tag_filter' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="clear-filter">Clear tag filter</a></p>
 </div>
 {% endif %}
 

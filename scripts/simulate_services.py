@@ -63,7 +63,7 @@ class ServiceSimulator:
         self.running = True
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-    
+
     def _tags_to_list(self, tags_dict):
         """Convert a dictionary of tags to datadog format list."""
         return [f"{key}:{value}" for key, value in tags_dict.items()]
@@ -143,11 +143,15 @@ class ServiceSimulator:
                 statsd.increment("api.requests.hits", tags=self._tags_to_list(tags))
 
                 # Response time
-                statsd.timing("api.response_time", response_time, tags=self._tags_to_list(tags))
+                statsd.timing(
+                    "api.response_time", response_time, tags=self._tags_to_list(tags)
+                )
 
                 # Error count (only for errors)
                 if status_code >= 400:
-                    statsd.increment("api.requests.errors", tags=self._tags_to_list(tags))
+                    statsd.increment(
+                        "api.requests.errors", tags=self._tags_to_list(tags)
+                    )
 
                 # Success rate gauge
                 success_rate = (1 - config["error_rate"]) * 100
@@ -176,17 +180,23 @@ class ServiceSimulator:
 
                 statsd.increment("worker.jobs.processed", tags=self._tags_to_list(tags))
                 statsd.timing(
-                    "worker.job.duration", int(processing_time * 1000), tags=self._tags_to_list(tags)
+                    "worker.job.duration",
+                    int(processing_time * 1000),
+                    tags=self._tags_to_list(tags),
                 )
 
                 # Occasional job failures
                 if random.random() < 0.02:  # 2% failure rate
-                    statsd.increment("worker.jobs.failed", tags=self._tags_to_list(tags))
+                    statsd.increment(
+                        "worker.jobs.failed", tags=self._tags_to_list(tags)
+                    )
 
             # Queue depth (gauge)
             queue_depth = max(0, random.gauss(20, 8))
             statsd.gauge(
-                "worker.queue.depth", int(queue_depth), tags=self._tags_to_list({"worker": worker})
+                "worker.queue.depth",
+                int(queue_depth),
+                tags=self._tags_to_list({"worker": worker}),
             )
 
     def simulate_database_metrics(self):
@@ -201,7 +211,8 @@ class ServiceSimulator:
                 query_time = random.lognormvariate(2.5, 0.8)  # log-normal distribution
 
                 statsd.increment(
-                    "db.queries.total", tags=self._tags_to_list({**tags, "query_type": query_type})
+                    "db.queries.total",
+                    tags=self._tags_to_list({**tags, "query_type": query_type}),
                 )
                 statsd.timing(
                     "db.query.duration",
@@ -212,8 +223,14 @@ class ServiceSimulator:
             # Connection pool
             pool_size = 20
             active_connections = random.randint(5, 18)
-            statsd.gauge("db.connections.active", active_connections, tags=self._tags_to_list(tags))
-            statsd.gauge("db.connections.pool_size", pool_size, tags=self._tags_to_list(tags))
+            statsd.gauge(
+                "db.connections.active",
+                active_connections,
+                tags=self._tags_to_list(tags),
+            )
+            statsd.gauge(
+                "db.connections.pool_size", pool_size, tags=self._tags_to_list(tags)
+            )
             statsd.gauge(
                 "db.connections.utilization",
                 (active_connections / pool_size) * 100,
@@ -223,7 +240,9 @@ class ServiceSimulator:
             # Slow query detection
             if random.random() < 0.1:  # 10% chance of slow query
                 slow_query_time = random.uniform(5000, 15000)  # 5-15 seconds
-                statsd.timing("db.query.slow", int(slow_query_time), tags=self._tags_to_list(tags))
+                statsd.timing(
+                    "db.query.slow", int(slow_query_time), tags=self._tags_to_list(tags)
+                )
 
     def simulate_cache_metrics(self):
         """Simulate cache (Redis) metrics."""
@@ -236,14 +255,24 @@ class ServiceSimulator:
             hits = int(total_ops * hit_rate)
             misses = total_ops - hits
 
-            statsd.increment("cache.operations.hits", hits, tags=self._tags_to_list(tags))
-            statsd.increment("cache.operations.misses", misses, tags=self._tags_to_list(tags))
-            statsd.gauge("cache.hit_rate", hit_rate * 100, tags=self._tags_to_list(tags))
+            statsd.increment(
+                "cache.operations.hits", hits, tags=self._tags_to_list(tags)
+            )
+            statsd.increment(
+                "cache.operations.misses", misses, tags=self._tags_to_list(tags)
+            )
+            statsd.gauge(
+                "cache.hit_rate", hit_rate * 100, tags=self._tags_to_list(tags)
+            )
 
             # Memory usage
             memory_used_mb = random.gauss(512, 50)  # ~512MB with variation
             memory_total_mb = 1024
-            statsd.gauge("cache.memory.used_mb", max(0, memory_used_mb), tags=self._tags_to_list(tags))
+            statsd.gauge(
+                "cache.memory.used_mb",
+                max(0, memory_used_mb),
+                tags=self._tags_to_list(tags),
+            )
             statsd.gauge(
                 "cache.memory.utilization",
                 (memory_used_mb / memory_total_mb) * 100,
@@ -263,25 +292,35 @@ class ServiceSimulator:
 
             # CPU usage (percentage)
             cpu_usage = max(0, min(100, random.gauss(25, 10)))
-            statsd.gauge("system.cpu.usage_percent", cpu_usage, tags=self._tags_to_list(tags))
+            statsd.gauge(
+                "system.cpu.usage_percent", cpu_usage, tags=self._tags_to_list(tags)
+            )
 
             # Memory usage
             memory_mb = max(100, random.gauss(256, 64))
-            statsd.gauge("system.memory.used_mb", memory_mb, tags=self._tags_to_list(tags))
+            statsd.gauge(
+                "system.memory.used_mb", memory_mb, tags=self._tags_to_list(tags)
+            )
 
             # Disk I/O
             if random.random() < 0.3:  # 30% chance of disk activity
                 disk_read_mb = random.expovariate(1 / 10)  # avg 10MB
                 disk_write_mb = random.expovariate(1 / 5)  # avg 5MB
-                statsd.gauge("system.disk.read_mb", disk_read_mb, tags=self._tags_to_list(tags))
-                statsd.gauge("system.disk.write_mb", disk_write_mb, tags=self._tags_to_list(tags))
+                statsd.gauge(
+                    "system.disk.read_mb", disk_read_mb, tags=self._tags_to_list(tags)
+                )
+                statsd.gauge(
+                    "system.disk.write_mb", disk_write_mb, tags=self._tags_to_list(tags)
+                )
 
     def simulate_custom_business_metrics(self):
         """Simulate business-specific metrics."""
         # User activity
         if random.random() < 0.8:  # 80% chance per second
             user_id = f"user_{random.randint(1, 1000)}"
-            statsd.set("users.active", user_id, tags=self._tags_to_list({"env": "local"}))
+            statsd.set(
+                "users.active", user_id, tags=self._tags_to_list({"env": "local"})
+            )
 
         # Orders
         if random.random() < 0.1:  # ~6 orders per minute
@@ -292,18 +331,26 @@ class ServiceSimulator:
 
             statsd.increment(
                 "business.orders.total",
-                tags=self._tags_to_list({"payment_method": payment_method, "env": "local"}),
+                tags=self._tags_to_list(
+                    {"payment_method": payment_method, "env": "local"}
+                ),
             )
             statsd.gauge(
                 "business.orders.value",
                 order_value,
-                tags=self._tags_to_list({"payment_method": payment_method, "env": "local"}),
+                tags=self._tags_to_list(
+                    {"payment_method": payment_method, "env": "local"}
+                ),
             )
 
         # Revenue tracking
         if random.random() < 0.05:  # Revenue updates less frequently
             revenue = random.uniform(1000, 5000)
-            statsd.gauge("business.revenue.daily", revenue, tags=self._tags_to_list({"env": "local"}))
+            statsd.gauge(
+                "business.revenue.daily",
+                revenue,
+                tags=self._tags_to_list({"env": "local"}),
+            )
 
     def run(self):
         """Main simulation loop."""
@@ -349,4 +396,3 @@ class ServiceSimulator:
 if __name__ == "__main__":
     simulator = ServiceSimulator()
     simulator.run()
-

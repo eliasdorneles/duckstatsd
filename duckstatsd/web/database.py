@@ -1,6 +1,7 @@
 import sqlite3
+import re
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 
 class MetricsDB:
@@ -14,6 +15,149 @@ class MetricsDB:
         """Convert row to dictionary."""
         columns = [col[0] for col in cursor.description]
         return dict(zip(columns, row))
+
+    def _parse_tag_filter_expression(self, expression: str) -> Tuple[str, List[str]]:
+        """
+        Parse complex tag filter expressions like:
+        - tag1:value1
+        - tag1:value1 OR tag2:value2
+        - tag1:value1 AND tag2:value2
+        - (tag1:value1 OR tag2:value2) AND -tag3:value3
+        - -tag1:value1
+
+        Returns (sql_condition, params_list)
+        """
+        if not expression or not expression.strip():
+            return "1=1", []
+
+        # Clean up the expression
+        expression = expression.strip()
+
+        # Simple tokenizer
+        tokens = self._tokenize_tag_expression(expression)
+        if not tokens:
+            return "1=1", []
+
+        # Parse the expression into SQL
+        sql_condition, params = self._parse_tag_tokens(tokens)
+        return sql_condition, params
+
+    def _tokenize_tag_expression(self, expression: str) -> List[str]:
+        """Tokenize the tag filter expression."""
+        # Pattern to match: tag:value, operators, parentheses, negation
+        # Updated to handle more characters in tag names and values
+        pattern = r"(\(|\)|AND|OR|-?[a-zA-Z_][a-zA-Z0-9_.-]*:[^()\s]+|-?[a-zA-Z_][a-zA-Z0-9_.-]*)"
+        tokens = re.findall(pattern, expression, re.IGNORECASE)
+        return [token.strip() for token in tokens if token.strip()]
+
+    def _parse_tag_tokens(self, tokens: List[str]) -> Tuple[str, List[str]]:
+        """Parse tokenized expression into SQL condition."""
+        if not tokens:
+            return "1=1", []
+
+        # Convert to postfix notation and then to SQL
+        try:
+            postfix = self._infix_to_postfix(tokens)
+            return self._postfix_to_sql(postfix)
+        except Exception:
+            # If parsing fails, fall back to simple single tag parsing
+            if len(tokens) == 1:
+                return self._parse_single_tag(tokens[0])
+            return "1=1", []
+
+    def _infix_to_postfix(self, tokens: List[str]) -> List[str]:
+        """Convert infix notation to postfix using Shunting Yard algorithm."""
+        precedence = {"OR": 1, "AND": 2}
+        stack = []
+        output = []
+
+        for token in tokens:
+            if self._is_tag_token(token):
+                output.append(token)
+            elif token.upper() in ["AND", "OR"]:
+                while (
+                    stack
+                    and stack[-1] != "("
+                    and stack[-1].upper() in precedence
+                    and precedence[stack[-1].upper()] >= precedence[token.upper()]
+                ):
+                    output.append(stack.pop())
+                stack.append(token.upper())
+            elif token == "(":
+                stack.append(token)
+            elif token == ")":
+                while stack and stack[-1] != "(":
+                    output.append(stack.pop())
+                if stack:
+                    stack.pop()  # Remove the '('
+
+        while stack:
+            output.append(stack.pop())
+
+        return output
+
+    def _postfix_to_sql(self, postfix: List[str]) -> Tuple[str, List[str]]:
+        """Convert postfix notation to SQL condition."""
+        stack = []
+        all_params = []
+
+        for token in postfix:
+            if self._is_tag_token(token):
+                condition, params = self._parse_single_tag(token)
+                stack.append(condition)
+                all_params.extend(params)
+            elif token.upper() == "AND":
+                if len(stack) >= 2:
+                    right = stack.pop()
+                    left = stack.pop()
+                    stack.append(f"({left} AND {right})")
+                elif len(stack) == 1:
+                    # If only one operand, just use it
+                    pass
+            elif token.upper() == "OR":
+                if len(stack) >= 2:
+                    right = stack.pop()
+                    left = stack.pop()
+                    stack.append(f"({left} OR {right})")
+                elif len(stack) == 1:
+                    # If only one operand, just use it
+                    pass
+
+        if stack:
+            return stack[0], all_params
+        return "1=1", []
+
+    def _is_tag_token(self, token: str) -> bool:
+        """Check if token is a tag (not an operator or parenthesis)."""
+        return token.upper() not in ["AND", "OR", "(", ")"] and (
+            ":" in token or token.startswith("-")
+        )
+
+    def _parse_single_tag(self, tag_token: str) -> Tuple[str, List[str]]:
+        """Parse a single tag token into SQL condition."""
+        # Handle negation
+        negated = tag_token.startswith("-")
+        if negated:
+            tag_token = tag_token[1:]
+
+        if ":" in tag_token:
+            # tag:value format
+            tag_key, tag_value = tag_token.split(":", 1)
+            condition = "json_extract(tags, '$.' || ?) = ?"
+            params = [tag_key, tag_value]
+        else:
+            # just tag key existence
+            tag_key = tag_token
+            condition = "json_extract(tags, '$.' || ?) IS NOT NULL"
+            params = [tag_key]
+
+        if negated:
+            if ":" in tag_token:
+                condition = f"NOT ({condition})"
+            else:
+                condition = "json_extract(tags, '$.' || ?) IS NULL"
+
+        return condition, params
 
     def get_recent_metrics(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get recent metrics for dashboard."""
@@ -252,15 +396,11 @@ class MetricsDB:
             params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
 
         if tag_filter:
-            # Parse tag_filter format: "key:value"
-            if ":" in tag_filter:
-                tag_key, tag_value = tag_filter.split(":", 1)
-                conditions.append("json_extract(tags, '$.' || ?) = ?")
-                params.extend([tag_key, tag_value])
-            else:
-                # Just search for tag key existence
-                conditions.append("json_extract(tags, '$.' || ?) IS NOT NULL")
-                params.append(tag_filter)
+            # Parse complex tag filter expression
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":  # Only add if it's not a no-op
+                conditions.append(tag_condition)
+                params.extend(tag_params)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         params.extend([limit, offset])

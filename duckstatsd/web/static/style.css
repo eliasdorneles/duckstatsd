@@ -372,6 +372,22 @@ button:hover,
   margin: 0 0.5rem;
 }
 
+.tag-filter-expression {
+  max-width: 500px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.filter-group small code {
+  background: #f8f9fa;
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  font-size: 0.75rem;
+}
+
 .clear-filter {
   color: #1976d2;
   text-decoration: none;
