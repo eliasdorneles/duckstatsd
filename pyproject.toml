@@ -1,0 +1,7 @@
+[project]
+name = "duckstatsd"
+version = "0.1.0"
+description = "Fake inspectable StatsD for local development"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
