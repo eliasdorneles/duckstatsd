@@ -1,77 +1,66 @@
 {% extends "base.html" %}
-
 {% block title %}Sets - DuckStatsD{% endblock %}
-
 {% block content %}
-<h2>Sets</h2>
-
-<div class="page-controls">
-    <form method="GET">
+    <h2>Sets</h2>
+    <div class="page-controls">
+        <form method="GET">
+            {% if selected_set %}<input type="hidden" name="metric" value="{{ selected_set }}">{% endif %}
+            <label for="hours">Time Range:</label>
+            <select name="hours" id="hours" onchange="this.form.submit()">
+                <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+                <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+                <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+                <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
+            </select>
+        </form>
+    </div>
+    <div class="sets-layout">
+        <section class="set-list">
+            <h3>Set Metrics</h3>
+            {% if set_metrics %}
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Unique Count</th>
+                            <th>Total Events</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for set_metric in set_metrics %}
+                            <tr class="{% if selected_set == set_metric.metric_name %}selected{% endif %}">
+                                <td>
+                                    <a href="?metric={{ set_metric.metric_name }}&hours={{ time_range }}">{{ set_metric.metric_name }}</a>
+                                </td>
+                                <td>{{ set_metric.unique_count }}</td>
+                                <td>{{ set_metric.event_count }}</td>
+                                <td>{{ set_metric.last_seen.split(" ")[1] [:8] if set_metric.last_seen else '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="no-data">No set metrics found.</p>
+            {% endif %}
+        </section>
         {% if selected_set %}
-            <input type="hidden" name="metric" value="{{ selected_set }}">
-        {% endif %}
-        <label for="hours">Time Range:</label>
-        <select name="hours" id="hours" onchange="this.form.submit()">
-            <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
-            <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
-            <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
-            <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
-        </select>
-    </form>
-</div>
-
-<div class="sets-layout">
-    <section class="set-list">
-        <h3>Set Metrics</h3>
-        {% if set_metrics %}
-        <table class="metrics-table">
-            <thead>
-                <tr>
-                    <th>Metric</th>
-                    <th>Unique Count</th>
-                    <th>Total Events</th>
-                    <th>Last Seen</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for set_metric in set_metrics %}
-                <tr class="{% if selected_set == set_metric.metric_name %}selected{% endif %}">
-                    <td>
-                        <a href="?metric={{ set_metric.metric_name }}&hours={{ time_range }}">
-                            {{ set_metric.metric_name }}
-                        </a>
-                    </td>
-                    <td>{{ set_metric.unique_count }}</td>
-                    <td>{{ set_metric.event_count }}</td>
-                    <td>{{ set_metric.last_seen.split(' ')[1][:8] if set_metric.last_seen else '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+            <section class="set-details">
+                <h3>Recent Members: {{ selected_set }}</h3>
+                {% if recent_members %}
+                    <div class="set-members">
+                        {% for member in recent_members %}<span class="set-member">{{ member }}</span>{% endfor %}
+                    </div>
+                {% else %}
+                    <p class="no-data">No recent members found.</p>
+                {% endif %}
+            </section>
         {% else %}
-        <p class="no-data">No set metrics found.</p>
+            <section class="set-details">
+                <div class="chart-placeholder">
+                    <p>Select a set metric from the list to view its recent unique members.</p>
+                </div>
+            </section>
         {% endif %}
-    </section>
-
-    {% if selected_set %}
-    <section class="set-details">
-        <h3>Recent Members: {{ selected_set }}</h3>
-        {% if recent_members %}
-        <div class="set-members">
-            {% for member in recent_members %}
-            <span class="set-member">{{ member }}</span>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="no-data">No recent members found.</p>
-        {% endif %}
-    </section>
-    {% else %}
-    <section class="set-details">
-        <div class="chart-placeholder">
-            <p>Select a set metric from the list to view its recent unique members.</p>
-        </div>
-    </section>
-    {% endif %}
-</div>
+    </div>
 {% endblock %}

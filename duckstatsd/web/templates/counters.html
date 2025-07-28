@@ -1,101 +1,91 @@
 {% extends "base.html" %}
-
 {% block title %}Counters - DuckStatsD{% endblock %}
-
 {% block content %}
-<h2>Counters</h2>
-
-<div class="page-controls">
-    <form method="GET">
+    <h2>Counters</h2>
+    <div class="page-controls">
+        <form method="GET">
+            {% if selected_counter %}<input type="hidden" name="metric" value="{{ selected_counter }}">{% endif %}
+            {% if selected_tag_key %}<input type="hidden" name="tag_key" value="{{ selected_tag_key }}">{% endif %}
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="hours">Time Range:</label>
+                    <select name="hours" id="hours" onchange="this.form.submit()">
+                        <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+                        <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+                        <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+                        <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
+                    </select>
+                </div>
+                {% if selected_counter and available_tag_keys %}
+                    <div class="control-group">
+                        <label for="tag_key">Group by Tag:</label>
+                        <select name="tag_key" id="tag_key" onchange="this.form.submit()">
+                            <option value="">No Grouping</option>
+                            {% for tag_key in available_tag_keys %}
+                                <option value="{{ tag_key }}"
+                                        {% if selected_tag_key == tag_key %}selected{% endif %}>{{ tag_key }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    <div class="counters-layout">
+        <section class="counter-list">
+            <h3>Counter Metrics</h3>
+            {% if counter_metrics %}
+                <table class="metrics-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Total Count</th>
+                            <th>Events</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for counter in counter_metrics %}
+                            <tr class="{% if selected_counter == counter.metric_name %}selected{% endif %}">
+                                <td>
+                                    <a href="?metric={{ counter.metric_name }}&hours={{ time_range }}{% if selected_tag_key %}&tag_key={{ selected_tag_key }}{% endif %}">
+                                        {{ counter.metric_name }}
+                                    </a>
+                                </td>
+                                <td>{{ "%.1f"|format(counter.total_count) }}</td>
+                                <td>{{ counter.event_count }}</td>
+                                <td>{{ counter.last_seen.split(" ")[1] [:8] if counter.last_seen else '-' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="no-data">No counter metrics found.</p>
+            {% endif %}
+        </section>
         {% if selected_counter %}
-            <input type="hidden" name="metric" value="{{ selected_counter }}">
-        {% endif %}
-        {% if selected_tag_key %}
-            <input type="hidden" name="tag_key" value="{{ selected_tag_key }}">
-        {% endif %}
-        <div class="control-row">
-            <div class="control-group">
-                <label for="hours">Time Range:</label>
-                <select name="hours" id="hours" onchange="this.form.submit()">
-                    <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
-                    <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
-                    <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
-                    <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
-                </select>
-            </div>
-            
-            {% if selected_counter and available_tag_keys %}
-            <div class="control-group">
-                <label for="tag_key">Group by Tag:</label>
-                <select name="tag_key" id="tag_key" onchange="this.form.submit()">
-                    <option value="">No Grouping</option>
-                    {% for tag_key in available_tag_keys %}
-                    <option value="{{ tag_key }}" {% if selected_tag_key == tag_key %}selected{% endif %}>
-                        {{ tag_key }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-        </div>
-    </form>
-</div>
-
-<div class="counters-layout">
-    <section class="counter-list">
-        <h3>Counter Metrics</h3>
-        {% if counter_metrics %}
-        <table class="metrics-table">
-            <thead>
-                <tr>
-                    <th>Metric</th>
-                    <th>Total Count</th>
-                    <th>Events</th>
-                    <th>Last Seen</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for counter in counter_metrics %}
-                <tr class="{% if selected_counter == counter.metric_name %}selected{% endif %}">
-                    <td>
-                        <a href="?metric={{ counter.metric_name }}&hours={{ time_range }}{% if selected_tag_key %}&tag_key={{ selected_tag_key }}{% endif %}">
-                            {{ counter.metric_name }}
-                        </a>
-                    </td>
-                    <td>{{ "%.1f"|format(counter.total_count) }}</td>
-                    <td>{{ counter.event_count }}</td>
-                    <td>{{ counter.last_seen.split(' ')[1][:8] if counter.last_seen else '-' }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+            <section class="counter-chart">
+                <h3>
+                    Rate Chart: {{ selected_counter }}
+                    {% if selected_tag_key %}<small>(grouped by {{ selected_tag_key }})</small>{% endif %}
+                </h3>
+                {% if chart_html %}
+                    {{ chart_html|safe }}
+                {% else %}
+                    <p class="no-data">No data for selected time range.</p>
+                {% endif %}
+            </section>
         {% else %}
-        <p class="no-data">No counter metrics found.</p>
+            <section class="counter-chart">
+                <div class="chart-placeholder">
+                    <p>Select a counter from the list to view its rate chart.</p>
+                    {% if available_tag_keys %}
+                        <p>
+                            <small>Use "Group by Tag" to see breakdowns by tag values.</small>
+                        </p>
+                    {% endif %}
+                </div>
+            </section>
         {% endif %}
-    </section>
-
-    {% if selected_counter %}
-    <section class="counter-chart">
-        <h3>Rate Chart: {{ selected_counter }}
-            {% if selected_tag_key %}
-                <small>(grouped by {{ selected_tag_key }})</small>
-            {% endif %}
-        </h3>
-        {% if chart_html %}
-            {{ chart_html|safe }}
-        {% else %}
-            <p class="no-data">No data for selected time range.</p>
-        {% endif %}
-    </section>
-    {% else %}
-    <section class="counter-chart">
-        <div class="chart-placeholder">
-            <p>Select a counter from the list to view its rate chart.</p>
-            {% if available_tag_keys %}
-            <p><small>Use "Group by Tag" to see breakdowns by tag values.</small></p>
-            {% endif %}
-        </div>
-    </section>
-    {% endif %}
-</div>
+    </div>
 {% endblock %}

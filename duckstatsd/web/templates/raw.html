@@ -1,121 +1,117 @@
 {% extends "base.html" %}
-
 {% block title %}Raw Data - DuckStatsD{% endblock %}
-
 {% block content %}
-<h2>Raw Data</h2>
-
-<div class="raw-filters">
-    <form method="GET">
-        <div class="filter-row">
-            <div class="filter-group">
-                <label for="hours">Time Range:</label>
-                <select id="hours" name="hours" onchange="this.form.submit()">
-                    <option value="">All Time</option>
-                    <option value="1" {% if filters.hours == '1' %}selected{% endif %}>Last 1 hour</option>
-                    <option value="6" {% if filters.hours == '6' %}selected{% endif %}>Last 6 hours</option>
-                    <option value="24" {% if filters.hours == '24' %}selected{% endif %}>Last 24 hours</option>
-                    <option value="168" {% if filters.hours == '168' %}selected{% endif %}>Last week</option>
-                </select>
+    <h2>Raw Data</h2>
+    <div class="raw-filters">
+        <form method="GET">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="hours">Time Range:</label>
+                    <select id="hours" name="hours" onchange="this.form.submit()">
+                        <option value="">All Time</option>
+                        <option value="1" {% if filters.hours == '1' %}selected{% endif %}>Last 1 hour</option>
+                        <option value="6" {% if filters.hours == '6' %}selected{% endif %}>Last 6 hours</option>
+                        <option value="24" {% if filters.hours == '24' %}selected{% endif %}>Last 24 hours</option>
+                        <option value="168" {% if filters.hours == '168' %}selected{% endif %}>Last week</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="metric_name">Metric Name:</label>
+                    <input type="text"
+                           id="metric_name"
+                           name="metric_name"
+                           value="{{ filters.metric_name or '' }}"
+                           placeholder="Filter by metric name"
+                           onchange="this.form.submit()">
+                </div>
+                <div class="filter-group">
+                    <label for="metric_type">Type:</label>
+                    <select id="metric_type" name="metric_type" onchange="this.form.submit()">
+                        <option value="">All Types</option>
+                        <option value="c" {% if filters.metric_type == 'c' %}selected{% endif %}>Counter</option>
+                        <option value="g" {% if filters.metric_type == 'g' %}selected{% endif %}>Gauge</option>
+                        <option value="ms" {% if filters.metric_type == 'ms' %}selected{% endif %}>Timer</option>
+                        <option value="s" {% if filters.metric_type == 's' %}selected{% endif %}>Set</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="tag_filter">Tag Filter:</label>
+                    <input type="text"
+                           id="tag_filter"
+                           name="tag_filter"
+                           value="{{ filters.tag_filter or '' }}"
+                           placeholder="status:200 OR (env:prod AND -method:GET)">
+                    <small>
+                        Examples: <code>status:200</code>, <code>env:prod AND method:GET</code>,
+                        <code>status:200 OR status:201</code>, <code>-status:500</code>,
+                        <code>(env:prod OR env:staging) AND -status:404</code>
+                    </small>
+                </div>
+                <div class="filter-group">
+                    <button type="submit">Filter</button>
+                    <a href="/raw" class="btn-reset">Reset</a>
+                </div>
             </div>
-            
-            <div class="filter-group">
-                <label for="metric_name">Metric Name:</label>
-                <input type="text" id="metric_name" name="metric_name" 
-                       value="{{ filters.metric_name or '' }}" 
-                       placeholder="Filter by metric name"
-                       onchange="this.form.submit()">
-            </div>
-            
-            <div class="filter-group">
-                <label for="metric_type">Type:</label>
-                <select id="metric_type" name="metric_type" onchange="this.form.submit()">
-                    <option value="">All Types</option>
-                    <option value="c" {% if filters.metric_type == 'c' %}selected{% endif %}>Counter</option>
-                    <option value="g" {% if filters.metric_type == 'g' %}selected{% endif %}>Gauge</option>
-                    <option value="ms" {% if filters.metric_type == 'ms' %}selected{% endif %}>Timer</option>
-                    <option value="s" {% if filters.metric_type == 's' %}selected{% endif %}>Set</option>
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label for="tag_filter">Tag Filter:</label>
-                <input type="text" id="tag_filter" name="tag_filter" 
-                       value="{{ filters.tag_filter or '' }}" 
-                       placeholder="status:200 OR (env:prod AND -method:GET)">
-                <small>
-                    Examples: <code>status:200</code>, <code>env:prod AND method:GET</code>, 
-                    <code>status:200 OR status:201</code>, <code>-status:500</code>,
-                    <code>(env:prod OR env:staging) AND -status:404</code>
-                </small>
-            </div>
-            
-            <div class="filter-group">
-                <button type="submit">Filter</button>
-                <a href="/raw" class="btn-reset">Reset</a>
-            </div>
-        </div>
-    </form>
-</div>
-
-{% if filters.tag_filter %}
-<div class="filter-status">
-    <p><strong>Tag Filter:</strong> <code class="tag-filter-expression">{{ filters.tag_filter }}</code>
-    <a href="?{% for key, value in filters.items() %}{% if key != 'tag_filter' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}" class="clear-filter">Clear tag filter</a></p>
-</div>
-{% endif %}
-
-<section class="raw-data">
-    {% if raw_metrics %}
-    <table class="metrics-table">
-        <thead>
-            <tr>
-                <th>Timestamp</th>
-                <th>Metric</th>
-                <th>Type</th>
-                <th>Value</th>
-                <th>Sample Rate</th>
-                <th>Tags</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for metric in raw_metrics %}
-            <tr>
-                <td>{{ metric.timestamp_display }}</td>
-                <td>{{ metric.metric_name }}</td>
-                <td><span class="metric-type metric-type-{{ metric.metric_type }}">{{ metric.metric_type }}</span></td>
-                <td>
-                    {% if metric.value is not none %}
-                        {{ "%.3f"|format(metric.value) }}
-                    {% else %}
-                        {{ metric.string_value }}
-                    {% endif %}
-                </td>
-                <td>{{ metric.sample_rate }}</td>
-                <td>
-                    {% if metric.tags %}
-                        <small>{{ metric.tags }}</small>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    
-    <div class="pagination">
-        {% if page > 1 %}
-        <a href="?{% for key, value in filters.items() %}{% if value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page - 1 }}" class="btn-page">← Previous</a>
-        {% endif %}
-        
-        <span class="page-info">Page {{ page }}</span>
-        
-        {% if has_next %}
-        <a href="?{% for key, value in filters.items() %}{% if value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page + 1 }}" class="btn-page">Next →</a>
-        {% endif %}
+        </form>
     </div>
-    
-    {% else %}
-    <p class="no-data">No metrics found matching the current filters.</p>
+    {% if filters.tag_filter %}
+        <div class="filter-status">
+            <p>
+                <strong>Tag Filter:</strong> <code class="tag-filter-expression">{{ filters.tag_filter }}</code>
+                <a href="?{% for key, value in filters.items() %}{% if key != 'tag_filter' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}"
+                   class="clear-filter">Clear tag filter</a>
+            </p>
+        </div>
     {% endif %}
-</section>
+    <section class="raw-data">
+        {% if raw_metrics %}
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Metric</th>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Sample Rate</th>
+                        <th>Tags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in raw_metrics %}
+                        <tr>
+                            <td>{{ metric.timestamp_display }}</td>
+                            <td>{{ metric.metric_name }}</td>
+                            <td>
+                                <span class="metric-type metric-type-{{ metric.metric_type }}">{{ metric.metric_type }}</span>
+                            </td>
+                            <td>
+                                {% if metric.value is not none %}
+                                    {{ "%.3f"|format(metric.value) }}
+                                {% else %}
+                                    {{ metric.string_value }}
+                                {% endif %}
+                            </td>
+                            <td>{{ metric.sample_rate }}</td>
+                            <td>
+                                {% if metric.tags %}<small>{{ metric.tags }}</small>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="pagination">
+                {% if page > 1 %}
+                    <a href="?{% for key, value in filters.items() %}{% if value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page - 1 }}"
+                       class="btn-page">← Previous</a>
+                {% endif %}
+                <span class="page-info">Page {{ page }}</span>
+                {% if has_next %}
+                    <a href="?{% for key, value in filters.items() %}{% if value %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page + 1 }}"
+                       class="btn-page">Next →</a>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="no-data">No metrics found matching the current filters.</p>
+        {% endif %}
+    </section>
 {% endblock %}

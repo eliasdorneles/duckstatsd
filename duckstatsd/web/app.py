@@ -16,10 +16,7 @@ def get_time_range():
 def add_global_context(**kwargs):
     """Add global context variables like time_range to template context."""
     time_range = get_time_range()
-    return {
-        "time_range": time_range,
-        **kwargs
-    }
+    return {"time_range": time_range, **kwargs}
 
 
 def create_app(db_path: str = "metrics.db"):
@@ -31,9 +28,7 @@ def create_app(db_path: str = "metrics.db"):
     @app.context_processor
     def inject_global_vars():
         """Inject global variables into all templates."""
-        return {
-            "time_range": get_time_range()
-        }
+        return {"time_range": get_time_range()}
 
     @app.route("/")
     def dashboard():

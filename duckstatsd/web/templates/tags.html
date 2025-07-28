@@ -1,161 +1,154 @@
 {% extends "base.html" %}
-
 {% block title %}Tags - DuckStatsD{% endblock %}
-
 {% block content %}
-<h2>Tags Explorer</h2>
-
-<div class="tags-layout">
-    <section class="tag-keys">
-        <h3>Tag Keys</h3>
-        {% if tag_keys %}
-        <div class="tag-key-list">
-            {% for tag_key in tag_keys %}
-            <div class="tag-key-item {% if selected_tag_key == tag_key %}selected{% endif %}">
-                <a href="?tag_key={{ tag_key }}">
-                    <span class="tag-key">{{ tag_key }}</span>
-                </a>
-            </div>
-            {% endfor %}
-        </div>
+    <h2>Tags Explorer</h2>
+    <div class="tags-layout">
+        <section class="tag-keys">
+            <h3>Tag Keys</h3>
+            {% if tag_keys %}
+                <div class="tag-key-list">
+                    {% for tag_key in tag_keys %}
+                        <div class="tag-key-item {% if selected_tag_key == tag_key %}selected{% endif %}">
+                            <a href="?tag_key={{ tag_key }}">
+                                <span class="tag-key">{{ tag_key }}</span>
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="no-data">No tags found in the database.</p>
+            {% endif %}
+        </section>
+        {% if selected_tag_key %}
+            <section class="tag-values">
+                <h3>Values for "{{ selected_tag_key }}"</h3>
+                {% if tag_values %}
+                    <table class="metrics-table">
+                        <thead>
+                            <tr>
+                                <th>Value</th>
+                                <th>Usage Count</th>
+                                <th>Last Seen</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for value in tag_values %}
+                                <tr>
+                                    <td>
+                                        <a href="/raw?tag_filter={{ selected_tag_key }}:{{ value.tag_value }}"
+                                           class="tag-value-link">
+                                            <span class="tag-value">{{ value.tag_value }}</span>
+                                        </a>
+                                    </td>
+                                    <td>{{ value.count }}</td>
+                                    <td>{{ value.last_seen.split(" ")[1] [:8] if value.last_seen else '-' }}</td>
+                                    <td>
+                                        <a href="/raw?tag_filter={{ selected_tag_key }}:{{ value.tag_value }}"
+                                           class="btn-small">View Metrics</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="no-data">No values found for this tag key.</p>
+                {% endif %}
+            </section>
         {% else %}
-        <p class="no-data">No tags found in the database.</p>
+            <section class="tag-overview">
+                <h3>Tag Overview</h3>
+                <div class="tag-overview-content">
+                    <p>Select a tag key from the left to explore its values and usage patterns.</p>
+                    {% if tag_summary %}
+                        <h4>Most Active Tags (24h)</h4>
+                        <table class="metrics-table">
+                            <thead>
+                                <tr>
+                                    <th>Tag Key</th>
+                                    <th>Usage Count</th>
+                                    <th>Unique Values</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for summary in tag_summary %}
+                                    <tr>
+                                        <td>
+                                            <a href="?tag_key={{ summary.tag_key }}">{{ summary.tag_key }}</a>
+                                        </td>
+                                        <td>{{ summary.usage_count }}</td>
+                                        <td>{{ summary.unique_values }}</td>
+                                        <td>{{ summary.last_seen.split(" ")[1] [:8] if summary.last_seen else '-' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
+                </div>
+            </section>
         {% endif %}
-    </section>
-
-    {% if selected_tag_key %}
-    <section class="tag-values">
-        <h3>Values for "{{ selected_tag_key }}"</h3>
-        {% if tag_values %}
-        <table class="metrics-table">
-            <thead>
-                <tr>
-                    <th>Value</th>
-                    <th>Usage Count</th>
-                    <th>Last Seen</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for value in tag_values %}
-                <tr>
-                    <td>
-                        <a href="/raw?tag_filter={{ selected_tag_key }}:{{ value.tag_value }}" class="tag-value-link">
-                            <span class="tag-value">{{ value.tag_value }}</span>
-                        </a>
-                    </td>
-                    <td>{{ value.count }}</td>
-                    <td>{{ value.last_seen.split(' ')[1][:8] if value.last_seen else '-' }}</td>
-                    <td>
-                        <a href="/raw?tag_filter={{ selected_tag_key }}:{{ value.tag_value }}" class="btn-small">
-                            View Metrics
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="no-data">No values found for this tag key.</p>
-        {% endif %}
-    </section>
-    {% else %}
-    <section class="tag-overview">
-        <h3>Tag Overview</h3>
-        <div class="tag-overview-content">
-            <p>Select a tag key from the left to explore its values and usage patterns.</p>
-            
-            {% if tag_summary %}
-            <h4>Most Active Tags (24h)</h4>
+    </div>
+    {% if top_combinations %}
+        <section class="tag-combinations">
+            <h3>Most Common Tag Combinations</h3>
             <table class="metrics-table">
                 <thead>
                     <tr>
-                        <th>Tag Key</th>
+                        <th>Tag Combination</th>
                         <th>Usage Count</th>
-                        <th>Unique Values</th>
                         <th>Last Seen</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for summary in tag_summary %}
-                    <tr>
-                        <td>
-                            <a href="?tag_key={{ summary.tag_key }}">
-                                {{ summary.tag_key }}
-                            </a>
-                        </td>
-                        <td>{{ summary.usage_count }}</td>
-                        <td>{{ summary.unique_values }}</td>
-                        <td>{{ summary.last_seen.split(' ')[1][:8] if summary.last_seen else '-' }}</td>
-                    </tr>
+                    {% for combo in top_combinations %}
+                        <tr>
+                            <td>
+                                <code class="tag-combo">{{ combo.tags }}</code>
+                            </td>
+                            <td>{{ combo.count }}</td>
+                            <td>{{ combo.last_seen.split(" ")[1] [:8] if combo.last_seen else '-' }}</td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            {% endif %}
-        </div>
-    </section>
+        </section>
     {% endif %}
-</div>
-
-{% if top_combinations %}
-<section class="tag-combinations">
-    <h3>Most Common Tag Combinations</h3>
-    <table class="metrics-table">
-        <thead>
-            <tr>
-                <th>Tag Combination</th>
-                <th>Usage Count</th>
-                <th>Last Seen</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for combo in top_combinations %}
-            <tr>
-                <td>
-                    <code class="tag-combo">{{ combo.tags }}</code>
-                </td>
-                <td>{{ combo.count }}</td>
-                <td>{{ combo.last_seen.split(' ')[1][:8] if combo.last_seen else '-' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</section>
-{% endif %}
-
-{% if recent_tagged_metrics %}
-<section class="recent-tagged">
-    <h3>Recent Tagged Metrics</h3>
-    <table class="metrics-table">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Metric</th>
-                <th>Type</th>
-                <th>Value</th>
-                <th>Tags</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for metric in recent_tagged_metrics %}
-            <tr>
-                <td>{{ metric.timestamp.split(' ')[1][:8] if metric.timestamp else '-' }}</td>
-                <td>{{ metric.metric_name }}</td>
-                <td><span class="metric-type metric-type-{{ metric.metric_type }}">{{ metric.metric_type }}</span></td>
-                <td>
-                    {% if metric.value is not none %}
-                        {{ "%.2f"|format(metric.value) }}
-                    {% else %}
-                        {{ metric.string_value }}
-                    {% endif %}
-                </td>
-                <td>
-                    <code class="tag-combo">{{ metric.tags }}</code>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</section>
-{% endif %}
+    {% if recent_tagged_metrics %}
+        <section class="recent-tagged">
+            <h3>Recent Tagged Metrics</h3>
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Metric</th>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Tags</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in recent_tagged_metrics %}
+                        <tr>
+                            <td>{{ metric.timestamp.split(" ")[1] [:8] if metric.timestamp else '-' }}</td>
+                            <td>{{ metric.metric_name }}</td>
+                            <td>
+                                <span class="metric-type metric-type-{{ metric.metric_type }}">{{ metric.metric_type }}</span>
+                            </td>
+                            <td>
+                                {% if metric.value is not none %}
+                                    {{ "%.2f"|format(metric.value) }}
+                                {% else %}
+                                    {{ metric.string_value }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <code class="tag-combo">{{ metric.tags }}</code>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
 {% endblock %}
