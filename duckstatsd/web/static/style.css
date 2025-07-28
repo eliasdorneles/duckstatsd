@@ -26,6 +26,16 @@ body {
   font-size: 1.5rem;
 }
 
+.brand-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-link:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
 .nav-links {
   display: flex;
   list-style: none;
