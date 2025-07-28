@@ -8,16 +8,37 @@ from datetime import datetime
 from .database import MetricsDB
 
 
+def get_time_range():
+    """Get time range from request args or default to 24 hours."""
+    return int(request.args.get("hours", 24))
+
+
+def add_global_context(**kwargs):
+    """Add global context variables like time_range to template context."""
+    time_range = get_time_range()
+    return {
+        "time_range": time_range,
+        **kwargs
+    }
+
+
 def create_app(db_path: str = "metrics.db"):
     app = Flask(__name__)
     app.json_encoder = PlotlyJSONEncoder
 
     db = MetricsDB(db_path)
 
+    @app.context_processor
+    def inject_global_vars():
+        """Inject global variables into all templates."""
+        return {
+            "time_range": get_time_range()
+        }
+
     @app.route("/")
     def dashboard():
         """Dashboard with recent activity and summary."""
-        time_range = int(request.args.get("hours", 24))
+        time_range = get_time_range()
 
         recent_metrics = db.get_recent_metrics(50)
         metrics_summary = db.get_metrics_summary(time_range)
@@ -36,7 +57,6 @@ def create_app(db_path: str = "metrics.db"):
             metrics_summary=metrics_summary,
             active_metrics=active_metrics,
             tag_summary=tag_summary,
-            time_range=time_range,
             current_page="dashboard",
         )
 
@@ -45,7 +65,7 @@ def create_app(db_path: str = "metrics.db"):
         """Counters page with rate chart."""
         selected_counter = request.args.get("metric")
         selected_tag_key = request.args.get("tag_key")
-        time_range = int(request.args.get("hours", 24))
+        time_range = get_time_range()
 
         counter_metrics = db.get_counter_metrics(time_range)
         available_tag_keys = db.get_all_tag_keys()
@@ -131,7 +151,6 @@ def create_app(db_path: str = "metrics.db"):
             selected_tag_key=selected_tag_key,
             available_tag_keys=available_tag_keys,
             chart_html=chart_html,
-            time_range=time_range,
             current_page="counters",
         )
 
@@ -139,7 +158,7 @@ def create_app(db_path: str = "metrics.db"):
     def gauges():
         """Gauges page with trend chart."""
         selected_gauge = request.args.get("metric")
-        time_range = int(request.args.get("hours", 24))
+        time_range = get_time_range()
 
         gauge_metrics = db.get_gauge_metrics(time_range)
         chart_html = None
@@ -186,7 +205,6 @@ def create_app(db_path: str = "metrics.db"):
             selected_gauge=selected_gauge,
             chart_html=chart_html,
             stats=stats,
-            time_range=time_range,
             current_page="gauges",
         )
 
@@ -194,7 +212,7 @@ def create_app(db_path: str = "metrics.db"):
     def timers():
         """Timers page with histogram."""
         selected_timer = request.args.get("metric")
-        time_range = int(request.args.get("hours", 24))
+        time_range = get_time_range()
 
         timer_metrics = db.get_timer_metrics(time_range)
         chart_html = None
@@ -223,7 +241,6 @@ def create_app(db_path: str = "metrics.db"):
             timer_metrics=timer_metrics,
             selected_timer=selected_timer,
             chart_html=chart_html,
-            time_range=time_range,
             current_page="timers",
         )
 
@@ -231,7 +248,7 @@ def create_app(db_path: str = "metrics.db"):
     def sets():
         """Sets page with cardinality info."""
         selected_set = request.args.get("metric")
-        time_range = int(request.args.get("hours", 24))
+        time_range = get_time_range()
 
         set_metrics = db.get_set_metrics(time_range)
         recent_members = []
@@ -244,7 +261,6 @@ def create_app(db_path: str = "metrics.db"):
             set_metrics=set_metrics,
             selected_set=selected_set,
             recent_members=recent_members,
-            time_range=time_range,
             current_page="sets",
         )
 
