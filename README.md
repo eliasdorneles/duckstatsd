@@ -6,6 +6,10 @@ DuckStatsD provides a drop-in replacement for StatsD servers during
 development, storing all metrics in SQLite for easy inspection and
 visualization through a built-in web UI.
 
+**NOTE:** This is a tool meant to be used during **development-only**, mostly
+for testing and debugging locally. It is _NOT_ meant for production usage, it
+does not replace a production-ready observability tool.
+
 ## Features
 
 - **StatsD Protocol Support**: Compatible with standard StatsD and DogStatsD (tag support)
@@ -13,6 +17,18 @@ visualization through a built-in web UI.
 - **Web UI**: Interactive dashboard with charts and raw data exploration
 - **SQLite Storage**: Persistent, inspectable metric storage
 - **Docker Ready**: Easy deployment with Docker Compose
+
+
+## Screenshots
+
+### Counter metric, grouping by tag in the chart
+
+![](screenshot-counters.png)
+
+### Raw data page showcasing filtering
+
+![](screenshot-raw.png)
+
 
 ## Quick Start with Docker
 
