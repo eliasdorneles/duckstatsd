@@ -326,7 +326,7 @@ button:hover,
   padding: 0.25rem 0.5rem;
   font-size: 0.8rem;
   background: #1976d2;
-  color: white;
+  color: white !important;
   text-decoration: none;
   border-radius: 3px;
 }
