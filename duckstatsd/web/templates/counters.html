@@ -24,7 +24,7 @@
                 </select>
             </div>
             
-            {% if available_tag_keys %}
+            {% if selected_counter and available_tag_keys %}
             <div class="control-group">
                 <label for="tag_key">Group by Tag:</label>
                 <select name="tag_key" id="tag_key" onchange="this.form.submit()">
