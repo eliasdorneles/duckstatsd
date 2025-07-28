@@ -5,6 +5,21 @@
 {% block content %}
 <h2>Sets</h2>
 
+<div class="page-controls">
+    <form method="GET">
+        {% if selected_set %}
+            <input type="hidden" name="metric" value="{{ selected_set }}">
+        {% endif %}
+        <label for="hours">Time Range:</label>
+        <select name="hours" id="hours" onchange="this.form.submit()">
+            <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+            <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+            <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+            <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
+        </select>
+    </form>
+</div>
+
 <div class="sets-layout">
     <section class="set-list">
         <h3>Set Metrics</h3>
@@ -22,7 +37,7 @@
                 {% for set_metric in set_metrics %}
                 <tr class="{% if selected_set == set_metric.metric_name %}selected{% endif %}">
                     <td>
-                        <a href="?metric={{ set_metric.metric_name }}">
+                        <a href="?metric={{ set_metric.metric_name }}&hours={{ time_range }}">
                             {{ set_metric.metric_name }}
                         </a>
                     </td>

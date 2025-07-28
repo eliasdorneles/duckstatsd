@@ -47,7 +47,7 @@ def create_app(db_path: str = "metrics.db"):
         selected_tag_key = request.args.get("tag_key")
         time_range = int(request.args.get("hours", 24))
 
-        counter_metrics = db.get_counter_metrics()
+        counter_metrics = db.get_counter_metrics(time_range)
         available_tag_keys = db.get_all_tag_keys()
         chart_html = None
 
@@ -141,7 +141,7 @@ def create_app(db_path: str = "metrics.db"):
         selected_gauge = request.args.get("metric")
         time_range = int(request.args.get("hours", 24))
 
-        gauge_metrics = db.get_gauge_metrics()
+        gauge_metrics = db.get_gauge_metrics(time_range)
         chart_html = None
         stats = None
 
@@ -196,7 +196,7 @@ def create_app(db_path: str = "metrics.db"):
         selected_timer = request.args.get("metric")
         time_range = int(request.args.get("hours", 24))
 
-        timer_metrics = db.get_timer_metrics()
+        timer_metrics = db.get_timer_metrics(time_range)
         chart_html = None
 
         if selected_timer:
@@ -231,18 +231,20 @@ def create_app(db_path: str = "metrics.db"):
     def sets():
         """Sets page with cardinality info."""
         selected_set = request.args.get("metric")
+        time_range = int(request.args.get("hours", 24))
 
-        set_metrics = db.get_set_metrics()
+        set_metrics = db.get_set_metrics(time_range)
         recent_members = []
 
         if selected_set:
-            recent_members = db.get_set_members(selected_set, 20)
+            recent_members = db.get_set_members(selected_set, 20, time_range)
 
         return render_template(
             "sets.html",
             set_metrics=set_metrics,
             selected_set=selected_set,
             recent_members=recent_members,
+            time_range=time_range,
             current_page="sets",
         )
 

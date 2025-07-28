@@ -217,21 +217,26 @@ class MetricsDB:
             )
             return cursor.fetchall()
 
-    def get_counter_metrics(self) -> List[Dict[str, Any]]:
-        """Get all counter metrics with totals."""
+    def get_counter_metrics(self, hours: int = 24) -> List[Dict[str, Any]]:
+        """Get counter metrics with totals filtered by time range."""
+        since = datetime.utcnow() - timedelta(hours=hours)
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT metric_name, 
                        SUM(value / sample_rate) as total_count,
                        COUNT(*) as event_count,
                        MAX(timestamp) as last_seen
                 FROM raw_metrics 
                 WHERE metric_type = 'c'
+                  AND timestamp >= ?
                 GROUP BY metric_name
                 ORDER BY total_count DESC
-            """)
+            """,
+                (since.strftime("%Y-%m-%d %H:%M:%S"),),
+            )
             return cursor.fetchall()
 
     def get_counter_timeseries(
@@ -257,24 +262,47 @@ class MetricsDB:
             )
             return cursor.fetchall()
 
-    def get_gauge_metrics(self) -> List[Dict[str, Any]]:
-        """Get current gauge values (latest for each metric)."""
+    def get_gauge_metrics(self, hours: int = None) -> List[Dict[str, Any]]:
+        """Get current gauge values (latest for each metric) filtered by time range."""
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT r1.metric_name, r1.value, r1.timestamp
-                FROM raw_metrics r1
-                INNER JOIN (
-                    SELECT metric_name, MAX(timestamp) as max_timestamp
-                    FROM raw_metrics 
-                    WHERE metric_type = 'g'
-                    GROUP BY metric_name
-                ) r2 ON r1.metric_name = r2.metric_name 
-                    AND r1.timestamp = r2.max_timestamp
-                WHERE r1.metric_type = 'g'
-                ORDER BY r1.metric_name
-            """)
+
+            if hours:
+                since = datetime.utcnow() - timedelta(hours=hours)
+                cursor.execute(
+                    """
+                    SELECT r1.metric_name, r1.value, r1.timestamp
+                    FROM raw_metrics r1
+                    INNER JOIN (
+                        SELECT metric_name, MAX(timestamp) as max_timestamp
+                        FROM raw_metrics 
+                        WHERE metric_type = 'g' AND timestamp >= ?
+                        GROUP BY metric_name
+                    ) r2 ON r1.metric_name = r2.metric_name 
+                        AND r1.timestamp = r2.max_timestamp
+                    WHERE r1.metric_type = 'g' AND r1.timestamp >= ?
+                    ORDER BY r1.metric_name
+                """,
+                    (
+                        since.strftime("%Y-%m-%d %H:%M:%S"),
+                        since.strftime("%Y-%m-%d %H:%M:%S"),
+                    ),
+                )
+            else:
+                cursor.execute("""
+                    SELECT r1.metric_name, r1.value, r1.timestamp
+                    FROM raw_metrics r1
+                    INNER JOIN (
+                        SELECT metric_name, MAX(timestamp) as max_timestamp
+                        FROM raw_metrics 
+                        WHERE metric_type = 'g'
+                        GROUP BY metric_name
+                    ) r2 ON r1.metric_name = r2.metric_name 
+                        AND r1.timestamp = r2.max_timestamp
+                    WHERE r1.metric_type = 'g'
+                    ORDER BY r1.metric_name
+                """)
             return cursor.fetchall()
 
     def get_gauge_timeseries(
@@ -298,23 +326,42 @@ class MetricsDB:
             )
             return cursor.fetchall()
 
-    def get_timer_metrics(self) -> List[Dict[str, Any]]:
-        """Get timer metrics with basic stats."""
+    def get_timer_metrics(self, hours: int = None) -> List[Dict[str, Any]]:
+        """Get timer metrics with basic stats filtered by time range."""
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT metric_name,
-                       AVG(value) as avg_value,
-                       MIN(value) as min_value,
-                       MAX(value) as max_value,
-                       COUNT(*) as event_count,
-                       MAX(timestamp) as last_seen
-                FROM raw_metrics 
-                WHERE metric_type = 'ms'
-                GROUP BY metric_name
-                ORDER BY avg_value DESC
-            """)
+
+            if hours:
+                since = datetime.utcnow() - timedelta(hours=hours)
+                cursor.execute(
+                    """
+                    SELECT metric_name,
+                           AVG(value) as avg_value,
+                           MIN(value) as min_value,
+                           MAX(value) as max_value,
+                           COUNT(*) as event_count,
+                           MAX(timestamp) as last_seen
+                    FROM raw_metrics 
+                    WHERE metric_type = 'ms' AND timestamp >= ?
+                    GROUP BY metric_name
+                    ORDER BY avg_value DESC
+                """,
+                    (since.strftime("%Y-%m-%d %H:%M:%S"),),
+                )
+            else:
+                cursor.execute("""
+                    SELECT metric_name,
+                           AVG(value) as avg_value,
+                           MIN(value) as min_value,
+                           MAX(value) as max_value,
+                           COUNT(*) as event_count,
+                           MAX(timestamp) as last_seen
+                    FROM raw_metrics 
+                    WHERE metric_type = 'ms'
+                    GROUP BY metric_name
+                    ORDER BY avg_value DESC
+                """)
             return cursor.fetchall()
 
     def get_timer_values(self, metric_name: str, hours: int = 24) -> List[float]:
@@ -335,38 +382,73 @@ class MetricsDB:
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def get_set_metrics(self) -> List[Dict[str, Any]]:
-        """Get set metrics with unique counts."""
+    def get_set_metrics(self, hours: int = None) -> List[Dict[str, Any]]:
+        """Get set metrics with unique counts filtered by time range."""
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT metric_name,
-                       COUNT(DISTINCT string_value) as unique_count,
-                       COUNT(*) as event_count,
-                       MAX(timestamp) as last_seen
-                FROM raw_metrics 
-                WHERE metric_type = 's'
-                GROUP BY metric_name
-                ORDER BY unique_count DESC
-            """)
+
+            if hours:
+                since = datetime.utcnow() - timedelta(hours=hours)
+                cursor.execute(
+                    """
+                    SELECT metric_name,
+                           COUNT(DISTINCT string_value) as unique_count,
+                           COUNT(*) as event_count,
+                           MAX(timestamp) as last_seen
+                    FROM raw_metrics 
+                    WHERE metric_type = 's' AND timestamp >= ?
+                    GROUP BY metric_name
+                    ORDER BY unique_count DESC
+                """,
+                    (since.strftime("%Y-%m-%d %H:%M:%S"),),
+                )
+            else:
+                cursor.execute("""
+                    SELECT metric_name,
+                           COUNT(DISTINCT string_value) as unique_count,
+                           COUNT(*) as event_count,
+                           MAX(timestamp) as last_seen
+                    FROM raw_metrics 
+                    WHERE metric_type = 's'
+                    GROUP BY metric_name
+                    ORDER BY unique_count DESC
+                """)
             return cursor.fetchall()
 
-    def get_set_members(self, metric_name: str, limit: int = 20) -> List[str]:
-        """Get recent unique set members."""
+    def get_set_members(
+        self, metric_name: str, limit: int = 20, hours: int = None
+    ) -> List[str]:
+        """Get recent unique set members filtered by time range."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT DISTINCT string_value
-                FROM raw_metrics 
-                WHERE metric_type = 's' 
-                  AND metric_name = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            """,
-                (metric_name, limit),
-            )
+
+            if hours:
+                since = datetime.utcnow() - timedelta(hours=hours)
+                cursor.execute(
+                    """
+                    SELECT DISTINCT string_value
+                    FROM raw_metrics 
+                    WHERE metric_type = 's' 
+                      AND metric_name = ?
+                      AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                """,
+                    (metric_name, since.strftime("%Y-%m-%d %H:%M:%S"), limit),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT string_value
+                    FROM raw_metrics 
+                    WHERE metric_type = 's' 
+                      AND metric_name = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                """,
+                    (metric_name, limit),
+                )
             return [row[0] for row in cursor.fetchall()]
 
     def get_raw_metrics(
