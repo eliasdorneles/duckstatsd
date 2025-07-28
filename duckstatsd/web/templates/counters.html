@@ -28,6 +28,11 @@
                         </select>
                     </div>
                 {% endif %}
+                {% include 'tag_filter.html' %}
+                <div class="control-group">
+                    <button type="submit">Apply Filters</button>
+                    <a href="/counters" class="btn-reset">Reset All</a>
+                </div>
             </div>
         </form>
     </div>

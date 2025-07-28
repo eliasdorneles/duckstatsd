@@ -217,238 +217,302 @@ class MetricsDB:
             )
             return cursor.fetchall()
 
-    def get_counter_metrics(self, hours: int = 24) -> List[Dict[str, Any]]:
-        """Get counter metrics with totals filtered by time range."""
+    def get_counter_metrics(
+        self, hours: int = 24, tag_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get counter metrics with totals filtered by time range and optional tag filter."""
         since = datetime.utcnow() - timedelta(hours=hours)
+        conditions = ["metric_type = 'c'", "timestamp >= ?"]
+        params = [since.strftime("%Y-%m-%d %H:%M:%S")]
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
             cursor.execute(
-                """
+                f"""
                 SELECT metric_name, 
                        SUM(value / sample_rate) as total_count,
                        COUNT(*) as event_count,
                        MAX(timestamp) as last_seen
                 FROM raw_metrics 
-                WHERE metric_type = 'c'
-                  AND timestamp >= ?
+                WHERE {where_clause}
                 GROUP BY metric_name
                 ORDER BY total_count DESC
             """,
-                (since.strftime("%Y-%m-%d %H:%M:%S"),),
+                params,
             )
             return cursor.fetchall()
 
     def get_counter_timeseries(
-        self, metric_name: str, hours: int = 24
+        self, metric_name: str, hours: int = 24, tag_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get counter events over time (per minute)."""
         since = datetime.utcnow() - timedelta(hours=hours)
+        conditions = ["metric_type = 'c'", "metric_name = ?", "timestamp >= ?"]
+        params = [metric_name, since.strftime("%Y-%m-%d %H:%M:%S")]
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
             cursor.execute(
-                """
+                f"""
                 SELECT strftime('%Y-%m-%d %H:%M:00', timestamp) as minute,
                        SUM(value / sample_rate) as count
                 FROM raw_metrics 
-                WHERE metric_type = 'c' 
-                  AND metric_name = ?
-                  AND timestamp >= ?
+                WHERE {where_clause}
                 GROUP BY minute
                 ORDER BY minute
             """,
-                (metric_name, since.strftime("%Y-%m-%d %H:%M:%S")),
+                params,
             )
             return cursor.fetchall()
 
-    def get_gauge_metrics(self, hours: int = None) -> List[Dict[str, Any]]:
-        """Get current gauge values (latest for each metric) filtered by time range."""
+    def get_gauge_metrics(
+        self, hours: int = None, tag_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get current gauge values (latest for each metric) filtered by time range and optional tag filter."""
+        conditions = ["metric_type = 'g'"]
+        params = []
+
+        if hours:
+            since = datetime.utcnow() - timedelta(hours=hours)
+            conditions.append("timestamp >= ?")
+            params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        subquery_where = " AND ".join(conditions)
+        outer_conditions = ["r1.metric_type = 'g'"]
+        outer_params = []
+
+        if hours:
+            outer_conditions.append("r1.timestamp >= ?")
+            outer_params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                outer_conditions.append(tag_condition.replace("tags", "r1.tags"))
+                outer_params.extend(tag_params)
+
+        outer_where = " AND ".join(outer_conditions)
+        all_params = params + outer_params
+
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-
-            if hours:
-                since = datetime.utcnow() - timedelta(hours=hours)
-                cursor.execute(
-                    """
-                    SELECT r1.metric_name, r1.value, r1.timestamp
-                    FROM raw_metrics r1
-                    INNER JOIN (
-                        SELECT metric_name, MAX(timestamp) as max_timestamp
-                        FROM raw_metrics 
-                        WHERE metric_type = 'g' AND timestamp >= ?
-                        GROUP BY metric_name
-                    ) r2 ON r1.metric_name = r2.metric_name 
-                        AND r1.timestamp = r2.max_timestamp
-                    WHERE r1.metric_type = 'g' AND r1.timestamp >= ?
-                    ORDER BY r1.metric_name
-                """,
-                    (
-                        since.strftime("%Y-%m-%d %H:%M:%S"),
-                        since.strftime("%Y-%m-%d %H:%M:%S"),
-                    ),
-                )
-            else:
-                cursor.execute("""
-                    SELECT r1.metric_name, r1.value, r1.timestamp
-                    FROM raw_metrics r1
-                    INNER JOIN (
-                        SELECT metric_name, MAX(timestamp) as max_timestamp
-                        FROM raw_metrics 
-                        WHERE metric_type = 'g'
-                        GROUP BY metric_name
-                    ) r2 ON r1.metric_name = r2.metric_name 
-                        AND r1.timestamp = r2.max_timestamp
-                    WHERE r1.metric_type = 'g'
-                    ORDER BY r1.metric_name
-                """)
+            cursor.execute(
+                f"""
+                SELECT r1.metric_name, r1.value, r1.timestamp
+                FROM raw_metrics r1
+                INNER JOIN (
+                    SELECT metric_name, MAX(timestamp) as max_timestamp
+                    FROM raw_metrics 
+                    WHERE {subquery_where}
+                    GROUP BY metric_name
+                ) r2 ON r1.metric_name = r2.metric_name 
+                    AND r1.timestamp = r2.max_timestamp
+                WHERE {outer_where}
+                ORDER BY r1.metric_name
+            """,
+                all_params,
+            )
             return cursor.fetchall()
 
     def get_gauge_timeseries(
-        self, metric_name: str, hours: int = 24
+        self, metric_name: str, hours: int = 24, tag_filter: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get gauge values over time."""
         since = datetime.utcnow() - timedelta(hours=hours)
+        conditions = ["metric_type = 'g'", "metric_name = ?", "timestamp >= ?"]
+        params = [metric_name, since.strftime("%Y-%m-%d %H:%M:%S")]
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
             cursor.execute(
-                """
+                f"""
                 SELECT timestamp, value
                 FROM raw_metrics 
-                WHERE metric_type = 'g' 
-                  AND metric_name = ?
-                  AND timestamp >= ?
+                WHERE {where_clause}
                 ORDER BY timestamp
             """,
-                (metric_name, since.strftime("%Y-%m-%d %H:%M:%S")),
+                params,
             )
             return cursor.fetchall()
 
-    def get_timer_metrics(self, hours: int = None) -> List[Dict[str, Any]]:
-        """Get timer metrics with basic stats filtered by time range."""
+    def get_timer_metrics(
+        self, hours: int = None, tag_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get timer metrics with basic stats filtered by time range and optional tag filter."""
+        conditions = ["metric_type = 'ms'"]
+        params = []
+
+        if hours:
+            since = datetime.utcnow() - timedelta(hours=hours)
+            conditions.append("timestamp >= ?")
+            params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-
-            if hours:
-                since = datetime.utcnow() - timedelta(hours=hours)
-                cursor.execute(
-                    """
-                    SELECT metric_name,
-                           AVG(value) as avg_value,
-                           MIN(value) as min_value,
-                           MAX(value) as max_value,
-                           COUNT(*) as event_count,
-                           MAX(timestamp) as last_seen
-                    FROM raw_metrics 
-                    WHERE metric_type = 'ms' AND timestamp >= ?
-                    GROUP BY metric_name
-                    ORDER BY avg_value DESC
-                """,
-                    (since.strftime("%Y-%m-%d %H:%M:%S"),),
-                )
-            else:
-                cursor.execute("""
-                    SELECT metric_name,
-                           AVG(value) as avg_value,
-                           MIN(value) as min_value,
-                           MAX(value) as max_value,
-                           COUNT(*) as event_count,
-                           MAX(timestamp) as last_seen
-                    FROM raw_metrics 
-                    WHERE metric_type = 'ms'
-                    GROUP BY metric_name
-                    ORDER BY avg_value DESC
-                """)
+            cursor.execute(
+                f"""
+                SELECT metric_name,
+                       AVG(value) as avg_value,
+                       MIN(value) as min_value,
+                       MAX(value) as max_value,
+                       COUNT(*) as event_count,
+                       MAX(timestamp) as last_seen
+                FROM raw_metrics 
+                WHERE {where_clause}
+                GROUP BY metric_name
+                ORDER BY avg_value DESC
+            """,
+                params,
+            )
             return cursor.fetchall()
 
-    def get_timer_values(self, metric_name: str, hours: int = 24) -> List[float]:
+    def get_timer_values(
+        self, metric_name: str, hours: int = 24, tag_filter: Optional[str] = None
+    ) -> List[float]:
         """Get timer values for histogram."""
         since = datetime.utcnow() - timedelta(hours=hours)
+        conditions = ["metric_type = 'ms'", "metric_name = ?", "timestamp >= ?"]
+        params = [metric_name, since.strftime("%Y-%m-%d %H:%M:%S")]
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
+                f"""
                 SELECT value
                 FROM raw_metrics 
-                WHERE metric_type = 'ms' 
-                  AND metric_name = ?
-                  AND timestamp >= ?
+                WHERE {where_clause}
                 ORDER BY timestamp
             """,
-                (metric_name, since.strftime("%Y-%m-%d %H:%M:%S")),
+                params,
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def get_set_metrics(self, hours: int = None) -> List[Dict[str, Any]]:
-        """Get set metrics with unique counts filtered by time range."""
+    def get_set_metrics(
+        self, hours: int = None, tag_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get set metrics with unique counts filtered by time range and optional tag filter."""
+        conditions = ["metric_type = 's'"]
+        params = []
+
+        if hours:
+            since = datetime.utcnow() - timedelta(hours=hours)
+            conditions.append("timestamp >= ?")
+            params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+
         with self._get_connection() as conn:
             conn.row_factory = self._dict_factory
             cursor = conn.cursor()
-
-            if hours:
-                since = datetime.utcnow() - timedelta(hours=hours)
-                cursor.execute(
-                    """
-                    SELECT metric_name,
-                           COUNT(DISTINCT string_value) as unique_count,
-                           COUNT(*) as event_count,
-                           MAX(timestamp) as last_seen
-                    FROM raw_metrics 
-                    WHERE metric_type = 's' AND timestamp >= ?
-                    GROUP BY metric_name
-                    ORDER BY unique_count DESC
-                """,
-                    (since.strftime("%Y-%m-%d %H:%M:%S"),),
-                )
-            else:
-                cursor.execute("""
-                    SELECT metric_name,
-                           COUNT(DISTINCT string_value) as unique_count,
-                           COUNT(*) as event_count,
-                           MAX(timestamp) as last_seen
-                    FROM raw_metrics 
-                    WHERE metric_type = 's'
-                    GROUP BY metric_name
-                    ORDER BY unique_count DESC
-                """)
+            cursor.execute(
+                f"""
+                SELECT metric_name,
+                       COUNT(DISTINCT string_value) as unique_count,
+                       COUNT(*) as event_count,
+                       MAX(timestamp) as last_seen
+                FROM raw_metrics 
+                WHERE {where_clause}
+                GROUP BY metric_name
+                ORDER BY unique_count DESC
+            """,
+                params,
+            )
             return cursor.fetchall()
 
     def get_set_members(
-        self, metric_name: str, limit: int = 20, hours: int = None
+        self,
+        metric_name: str,
+        limit: int = 20,
+        hours: int = None,
+        tag_filter: Optional[str] = None,
     ) -> List[str]:
-        """Get recent unique set members filtered by time range."""
+        """Get recent unique set members filtered by time range and optional tag filter."""
+        conditions = ["metric_type = 's'", "metric_name = ?"]
+        params = [metric_name]
+
+        if hours:
+            since = datetime.utcnow() - timedelta(hours=hours)
+            conditions.append("timestamp >= ?")
+            params.append(since.strftime("%Y-%m-%d %H:%M:%S"))
+
+        if tag_filter:
+            tag_condition, tag_params = self._parse_tag_filter_expression(tag_filter)
+            if tag_condition != "1=1":
+                conditions.append(tag_condition)
+                params.extend(tag_params)
+
+        where_clause = " AND ".join(conditions)
+        params.append(limit)
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-
-            if hours:
-                since = datetime.utcnow() - timedelta(hours=hours)
-                cursor.execute(
-                    """
-                    SELECT DISTINCT string_value
-                    FROM raw_metrics 
-                    WHERE metric_type = 's' 
-                      AND metric_name = ?
-                      AND timestamp >= ?
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                """,
-                    (metric_name, since.strftime("%Y-%m-%d %H:%M:%S"), limit),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT DISTINCT string_value
-                    FROM raw_metrics 
-                    WHERE metric_type = 's' 
-                      AND metric_name = ?
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                """,
-                    (metric_name, limit),
-                )
+            cursor.execute(
+                f"""
+                SELECT DISTINCT string_value
+                FROM raw_metrics 
+                WHERE {where_clause}
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """,
+                params,
+            )
             return [row[0] for row in cursor.fetchall()]
 
     def get_raw_metrics(

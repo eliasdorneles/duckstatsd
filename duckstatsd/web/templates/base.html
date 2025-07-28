@@ -12,35 +12,37 @@
     <body>
         <nav class="navbar">
             <div class="nav-brand">
-                <h1><a href="/" class="brand-link">🦆 DuckStatsD</a></h1>
+                <h1>
+                    <a href="/" class="brand-link">🦆 DuckStatsD</a>
+                </h1>
             </div>
             <ul class="nav-links">
                 <li>
-                    <a href="/?hours={{ time_range }}"
+                    <a href="/?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'dashboard' %}active{% endif %}">Dashboard</a>
                 </li>
                 <li>
-                    <a href="/counters?hours={{ time_range }}"
+                    <a href="/counters?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'counters' %}active{% endif %}">Counters</a>
                 </li>
                 <li>
-                    <a href="/gauges?hours={{ time_range }}"
+                    <a href="/gauges?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'gauges' %}active{% endif %}">Gauges</a>
                 </li>
                 <li>
-                    <a href="/timers?hours={{ time_range }}"
+                    <a href="/timers?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'timers' %}active{% endif %}">Timers</a>
                 </li>
                 <li>
-                    <a href="/sets?hours={{ time_range }}"
+                    <a href="/sets?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'sets' %}active{% endif %}">Sets</a>
                 </li>
                 <li>
-                    <a href="/tags?hours={{ time_range }}"
+                    <a href="/tags?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'tags' %}active{% endif %}">Tags</a>
                 </li>
                 <li>
-                    <a href="/raw?hours={{ time_range }}"
+                    <a href="/raw?hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get('tag_filter') }}{% endif %}"
                        class="{% if current_page == 'raw' %}active{% endif %}">Raw Data</a>
                 </li>
             </ul>

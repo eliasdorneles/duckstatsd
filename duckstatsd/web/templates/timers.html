@@ -5,13 +5,22 @@
     <div class="page-controls">
         <form method="GET">
             {% if selected_timer %}<input type="hidden" name="metric" value="{{ selected_timer }}">{% endif %}
-            <label for="hours">Time Range:</label>
-            <select name="hours" id="hours" onchange="this.form.submit()">
-                <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
-                <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
-                <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
-                <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
-            </select>
+            <div class="control-row">
+                <div class="control-group">
+                    <label for="hours">Time Range:</label>
+                    <select name="hours" id="hours" onchange="this.form.submit()">
+                        <option value="1" {% if time_range == 1 %}selected{% endif %}>Last 1 hour</option>
+                        <option value="6" {% if time_range == 6 %}selected{% endif %}>Last 6 hours</option>
+                        <option value="24" {% if time_range == 24 %}selected{% endif %}>Last 24 hours</option>
+                        <option value="168" {% if time_range == 168 %}selected{% endif %}>Last week</option>
+                    </select>
+                </div>
+                {% include 'tag_filter.html' %}
+                <div class="control-group">
+                    <button type="submit">Apply Filters</button>
+                    <a href="/timers" class="btn-reset">Reset All</a>
+                </div>
+            </div>
         </form>
     </div>
     <div class="timers-layout">
@@ -33,7 +42,7 @@
                         {% for timer in timer_metrics %}
                             <tr class="{% if selected_timer == timer.metric_name %}selected{% endif %}">
                                 <td>
-                                    <a href="?metric={{ timer.metric_name }}&hours={{ time_range }}">{{ timer.metric_name }}</a>
+                                    <a href="?metric={{ timer.metric_name }}&hours={{ time_range }}{% if request.args.get('tag_filter') %}&tag_filter={{ request.args.get("tag_filter") }}{% endif %}">{{ timer.metric_name }}</a>
                                 </td>
                                 <td>{{ "%.1f"|format(timer.avg_value) }}</td>
                                 <td>{{ "%.1f"|format(timer.min_value) }}</td>

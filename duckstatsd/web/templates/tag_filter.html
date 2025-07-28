@@ -1,0 +1,23 @@
+<!-- Tag Filter Component -->
+<div class="filter-group">
+    <label for="tag_filter">Tag Filter:</label>
+    <input type="text"
+           id="tag_filter"
+           name="tag_filter"
+           value="{{ filters.tag_filter or request.args.get('tag_filter', '') }}"
+           placeholder="status:200 OR (env:prod AND -method:GET)">
+    <small>
+        Examples: <code>status:200</code>, <code>env:prod AND method:GET</code>,
+        <code>status:200 OR status:201</code>, <code>-status:500</code>,
+        <code>(env:prod OR env:staging) AND -status:404</code>
+    </small>
+</div>
+{% if filters.tag_filter or request.args.get('tag_filter') %}
+    <div class="filter-status">
+        <p>
+            <strong>Tag Filter:</strong> <code class="tag-filter-expression">{{ filters.tag_filter or request.args.get("tag_filter") }}</code>
+            <a href="?{% for key, value in request.args.items() %}{% if key != 'tag_filter' and value %}{{ key }}={{ value }}&{% endif %}{% endfor %}"
+               class="clear-filter">Clear tag filter</a>
+        </p>
+    </div>
+{% endif %}

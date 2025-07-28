@@ -60,9 +60,10 @@ def create_app(db_path: str = "metrics.db"):
         """Counters page with rate chart."""
         selected_counter = request.args.get("metric")
         selected_tag_key = request.args.get("tag_key")
+        tag_filter = request.args.get("tag_filter", "").strip() or None
         time_range = get_time_range()
 
-        counter_metrics = db.get_counter_metrics(time_range)
+        counter_metrics = db.get_counter_metrics(time_range, tag_filter)
         available_tag_keys = db.get_all_tag_keys()
         chart_html = None
 
@@ -109,7 +110,7 @@ def create_app(db_path: str = "metrics.db"):
             else:
                 # Regular chart
                 timeseries_data = db.get_counter_timeseries(
-                    selected_counter, time_range
+                    selected_counter, time_range, tag_filter
                 )
 
                 if timeseries_data:
@@ -146,6 +147,7 @@ def create_app(db_path: str = "metrics.db"):
             selected_tag_key=selected_tag_key,
             available_tag_keys=available_tag_keys,
             chart_html=chart_html,
+            filters=request.args,
             current_page="counters",
         )
 
@@ -153,14 +155,17 @@ def create_app(db_path: str = "metrics.db"):
     def gauges():
         """Gauges page with trend chart."""
         selected_gauge = request.args.get("metric")
+        tag_filter = request.args.get("tag_filter", "").strip() or None
         time_range = get_time_range()
 
-        gauge_metrics = db.get_gauge_metrics(time_range)
+        gauge_metrics = db.get_gauge_metrics(time_range, tag_filter)
         chart_html = None
         stats = None
 
         if selected_gauge:
-            timeseries_data = db.get_gauge_timeseries(selected_gauge, time_range)
+            timeseries_data = db.get_gauge_timeseries(
+                selected_gauge, time_range, tag_filter
+            )
 
             if timeseries_data:
                 times = [item["timestamp"] for item in timeseries_data]
@@ -200,6 +205,7 @@ def create_app(db_path: str = "metrics.db"):
             selected_gauge=selected_gauge,
             chart_html=chart_html,
             stats=stats,
+            filters=request.args,
             current_page="gauges",
         )
 
@@ -207,13 +213,14 @@ def create_app(db_path: str = "metrics.db"):
     def timers():
         """Timers page with histogram."""
         selected_timer = request.args.get("metric")
+        tag_filter = request.args.get("tag_filter", "").strip() or None
         time_range = get_time_range()
 
-        timer_metrics = db.get_timer_metrics(time_range)
+        timer_metrics = db.get_timer_metrics(time_range, tag_filter)
         chart_html = None
 
         if selected_timer:
-            timer_values = db.get_timer_values(selected_timer, time_range)
+            timer_values = db.get_timer_values(selected_timer, time_range, tag_filter)
 
             if timer_values:
                 fig = go.Figure()
@@ -236,6 +243,7 @@ def create_app(db_path: str = "metrics.db"):
             timer_metrics=timer_metrics,
             selected_timer=selected_timer,
             chart_html=chart_html,
+            filters=request.args,
             current_page="timers",
         )
 
@@ -243,19 +251,23 @@ def create_app(db_path: str = "metrics.db"):
     def sets():
         """Sets page with cardinality info."""
         selected_set = request.args.get("metric")
+        tag_filter = request.args.get("tag_filter", "").strip() or None
         time_range = get_time_range()
 
-        set_metrics = db.get_set_metrics(time_range)
+        set_metrics = db.get_set_metrics(time_range, tag_filter)
         recent_members = []
 
         if selected_set:
-            recent_members = db.get_set_members(selected_set, 20, time_range)
+            recent_members = db.get_set_members(
+                selected_set, 20, time_range, tag_filter
+            )
 
         return render_template(
             "sets.html",
             set_metrics=set_metrics,
             selected_set=selected_set,
             recent_members=recent_members,
+            filters=request.args,
             current_page="sets",
         )
 
