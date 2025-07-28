@@ -172,3 +172,15 @@ DuckStatsD consists of:
 1. **UDP Server**: Listens for StatsD packets on port 8125
 2. **Web UI**: Flask application for visualization and exploration
 3. **Storage**: SQLite database with single table `raw_metrics`
+
+## Similar projects
+
+* [statsd-logger](https://github.com/zendesk/statsd-logger) by Zendesk
+  * very simple logger, mainly for debugging metrics
+  * highlights Datadog-style tags
+* [statstee](https://github.com/rodaine/statstee)
+  * captures the UDP packets with metrics using libpcap, needs root permissions
+  * can be used to troubleshoot misbehaving applications in production environments that are sending too many metrics.
+  * no support for Datadog-style tags
+
+I created DuckStatsD because neither of these tools fit the bill for me, because I wanted something to be able to query and filter, notably to filter by Datadog-style tags.
